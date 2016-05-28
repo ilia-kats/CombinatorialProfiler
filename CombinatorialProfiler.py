@@ -5,46 +5,7 @@ import os.path
 import subprocess
 import csv
 
-class BarcodeSet:
-    ttable = str.maketrans('ATGC', 'TACG')
-
-    def __init__(self, fpath):
-        with open(fpath) as bcodefile:
-            sample = bcodefile.read(1024)
-            bcodefile.seek(0)
-            s = csv.Sniffer()
-            dialect = s.sniff(sample)
-            has_header = s.has_header(sample)
-            reader = csv.reader(bcodefile, dialect)
-            if has_header:
-                next(reader)
-            codes = {}
-            for r in reader:
-                codes[r[0]] = r[1].upper()
-            self._generate_unique(codes)
-            self._make_reverse()
-
-    def _generate_unique(self, codes):
-        self.fw = {}
-        for k, b in codes.items():
-            bcodes = []
-            for s in range(0, len(b)):
-                found = False
-                for key, barcode in codes.items():
-                    if not key == k and barcode.find(b[s:]) != -1:
-                        found = True
-                        break
-                if not found:
-                    bcodes.append(b[s:])
-            self.fw[k] = tuple(bcodes)
-
-    def _make_reverse(self):
-        self.rev = {}
-        for k, v in self.fw.items():
-            self.rev[k] = tuple(BarcodeSet.reverse_compl(bcode) for bcode in v)
-
-    def reverse_compl(sequence):
-        sequence.translate(BarcodeSet.ttable)[::-1]
+from readcounter.readcounter import PyBarcodeSet
 
 if __name__ == '__main__':
     import argparse
@@ -96,6 +57,6 @@ if __name__ == '__main__':
     mergedfqname += '.assembled.fastq'
 
     if args.forward_barcodes:
-        fwcodes = BarcodeSet(args.forward_barcodes)
+        fwcodes = PyBarcodeSet(args.forward_barcodes)
     if args.reverse_barcodes:
-        revcodes = BarcodeSet(args.reverse_barcodes)
+        revcodes = PyBarcodeSet(args.reverse_barcodes)
