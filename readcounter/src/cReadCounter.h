@@ -28,21 +28,21 @@ class Read
 {
 public:
     Read();
-    Read(const std::string &name);
-    Read(const std::string &name, const std::string &sequence);
-    Read(const std::string &name, const std::string &sequence, const std::string &description);
-    Read(const std::string &name, const std::string &sequence, const std::string &description, const std::string &quality);
+    Read(std::string name);
+    Read(std::string name, std::string sequence);
+    Read(std::string name, std::string sequence, std::string description);
+    Read(std::string name, std::string sequence, std::string description, std::string quality);
 
-    void setName(const std::string&);
+    void setName(std::string);
     const std::string& getName() const;
 
-    void setSequence(const std::string&);
+    void setSequence(std::string);
     const std::string& getSequence() const;
 
-    void setDescription(const std::string&);
+    void setDescription(std::string);
     const std::string& getDescription() const;
 
-    void setQuality(const std::string&);
+    void setQuality(std::string);
     const std::string& getQuality() const;
 
     Read reverseComplement() const;
@@ -74,12 +74,24 @@ class ReadCounter
 {
 public:
     ReadCounter(const std::string&, BarcodeSet *fw=nullptr, BarcodeSet *rev=nullptr);
-    void countReads(const std::string&, int threads=1);
+    void countReads(const std::string&, const std::string&, int threads=1);
     const std::unordered_map<std::pair<std::string, std::string>, std::unordered_map<std::string, uint64_t>>& getCounts() const;
 
+    uint64_t read() const;
+    uint64_t counted() const;
+    uint64_t unmatchedInsert() const;
+    uint64_t unmatchedBarcodeFw() const;
+    uint64_t unmatchedBarcodeRev() const;
+
 private:
-    class ThreadSynchronization;
+    struct ThreadSynchronization;
     std::unordered_map<std::pair<std::string, std::string>, std::unordered_map<std::string, uint64_t>> m_counts;
+
+    uint64_t m_read;
+    uint64_t m_counted;
+    uint64_t m_unmatched_insert;
+    uint64_t m_unmatched_fw;
+    uint16_t m_unmatched_rev;
 
     SequenceMatcher m_matcher;
     BarcodeSet *m_barcodes_fw;
@@ -87,6 +99,7 @@ private:
 
     void readFile(const std::string&, ThreadSynchronization*);
     void matchRead(ThreadSynchronization*);
+    void writeReads(const std::string&, ThreadSynchronization*);
 
     static const std::string dummykey;
 };

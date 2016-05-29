@@ -17,8 +17,13 @@ cdef extern from "cReadCounter.h" nogil:
 
     cdef cppclass ReadCounter:
         ReadCounter(const string&, BarcodeSet*, BarcodeSet*) except+
-        void countReads(const string&, int)
+        void countReads(const string&, const string&, int)
         const unordered_map[pair[string, string], unordered_map[string, uint64_t]]& getCounts()
+        uint64_t read()
+        uint64_t counted()
+        uint64_t unmatchedInsert()
+        uint64_t unmatchedBarcodeFw()
+        uint64_t unmatchedBarcodeRev()
 
 
 cdef class PyBarcodeSet:
@@ -111,10 +116,30 @@ cdef class PyReadCounter:
     def __dealloc__(self):
         del self._rdcntr
 
-    def countReads(self, unicode fpath, threads=1):
-        self._rdcntr.countReads(fpath.encode(), threads)
+    def countReads(self, unicode fpath, unicode unmatchedpattern, threads=1):
+        self._rdcntr.countReads(fpath.encode(), unmatchedpattern.encode(), threads)
 
     @property
     def counts(self):
         return self._rdcntr.getCounts()
+
+    @property
+    def read(self):
+        return self._rdcntr.read()
+
+    @property
+    def counted(self):
+        return self._rdcntr.counted()
+
+    @property
+    def unmatched_insert(self):
+        return self._rdcntr.unmatchedInsert()
+
+    @property
+    def unmatched_barcode_fw(self):
+        return self._rdcntr.unmatchedBarcodeFw()
+
+    @property
+    def unmatched_barcode_rev(self):
+        return self._rdcntr.unmatchedBarcodeRev()
 

@@ -18,25 +18,25 @@ BarcodeSet::BarcodeSet(const std::unordered_map<std::string, std::vector<std::st
 Read::Read()
 {}
 
-Read::Read(const std::string &name)
-: m_name(name)
+Read::Read(std::string name)
+: m_name(std::move(name))
 {}
 
-Read::Read(const std::string &name, const std::string &sequence)
-: m_name(name), m_sequence(sequence)
+Read::Read(std::string name, std::string sequence)
+: m_name(std::move(name)), m_sequence(std::move(sequence))
 {}
 
-Read::Read(const std::string &name, const std::string &sequence, const std::string &description)
-: m_name(name), m_sequence(sequence), m_description(description)
+Read::Read(std::string name, std::string sequence, std::string description)
+: m_name(std::move(name)), m_sequence(std::move(sequence)), m_description(std::move(description))
 {}
 
-Read::Read(const std::string &name, const std::string &sequence, const std::string &description, const std::string &quality)
-: m_name(name), m_sequence(sequence), m_description(description), m_quality(quality)
+Read::Read(std::string name, std::string sequence, std::string description, std::string quality)
+: m_name(std::move(name)), m_sequence(std::move(sequence)), m_description(std::move(description)), m_quality(std::move(quality))
 {}
 
-void Read::setName(const std::string &name)
+void Read::setName(std::string name)
 {
-    m_name = name;
+    m_name = std::move(name);
 }
 
 const std::string& Read::getName() const
@@ -44,9 +44,9 @@ const std::string& Read::getName() const
     return m_name;
 }
 
-void Read::setSequence(const std::string &sequence)
+void Read::setSequence(std::string sequence)
 {
-    m_sequence = sequence;
+    m_sequence = std::move(sequence);
 }
 
 const std::string& Read::getSequence() const
@@ -54,9 +54,9 @@ const std::string& Read::getSequence() const
     return m_sequence;
 }
 
-void Read::setDescription(const std::string &description)
+void Read::setDescription(std::string description)
 {
-    m_description = description;
+    m_description = std::move(description);
 }
 
 const std::string& Read::getDescription() const
@@ -64,9 +64,9 @@ const std::string& Read::getDescription() const
     return m_description;
 }
 
-void Read::setQuality(const std::string &quality)
+void Read::setQuality(std::string quality)
 {
-    m_quality = quality;
+    m_quality = std::move(quality);
 }
 
 const std::string& Read::getQuality() const
@@ -155,52 +155,130 @@ std::pair<std::string::size_type, std::string::size_type> SequenceMatcher::match
 }
 
 ReadCounter::ReadCounter(const std::string &insertseq, BarcodeSet *fw, BarcodeSet *rev)
-: m_matcher(insertseq), m_barcodes_fw(fw), m_barcodes_rev(rev)
+: m_read(0), m_counted(0), m_unmatched_insert(0), m_unmatched_fw(0), m_unmatched_rev(0), m_matcher(insertseq), m_barcodes_fw(fw), m_barcodes_rev(rev)
 {}
 
-class ReadCounter::ThreadSynchronization
+struct ReadCounter::ThreadSynchronization
 {
-public:
+    struct FailedMatch
+    {
+        Read read;
+        bool insertfailed;
+        std::string barcode_fw;
+        std::string barcode_rev;
+
+        FailedMatch(Read r, bool i, std::string fw, std::string rev)
+        : read(std::move(r)), insertfailed(i), barcode_fw(std::move(fw)), barcode_rev(std::move(rev))
+        {}
+    };
     static constexpr int maxsize = 500;
-    std::queue<Read> queue;
-    std::mutex queuemutex;
-    std::mutex countsmutex;
+    std::queue<Read> inqueue;
+    std::mutex inqueuemutex;
     std::atomic<bool> eof;
-    std::condition_variable queuefull;
-    std::condition_variable queueempty;
+    std::condition_variable inqueuefull;
+    std::condition_variable inqueueempty;
+
+    std::atomic<bool> finishedMatching;
+
+    std::queue<FailedMatch> outqueue;
+    std::mutex outqueuemutex;
+    std::condition_variable outqueuefull;
+    std::condition_variable outqueueempty;
+
+    std::mutex countsmutex;
 };
 
-void ReadCounter::countReads(const std::string &file, int threads)
+void ReadCounter::countReads(const std::string &file, const std::string &outprefix, int threads)
 {
     ThreadSynchronization sync;
+    sync.finishedMatching = false;
     std::thread reader(&ReadCounter::readFile, this, file, &sync);
+    std::thread writer(&ReadCounter::writeReads, this, outprefix, &sync);
     std::vector<std::thread> workers;
     for (int i = 0; i < threads; ++i)
         workers.emplace_back(&ReadCounter::matchRead, this, &sync);
     reader.join();
     for (auto &worker : workers)
         worker.join();
+    sync.finishedMatching = true;
+    sync.outqueueempty.notify_one();
+    writer.join();
+}
+
+uint64_t ReadCounter::read() const
+{
+    return m_read;
+}
+
+uint64_t ReadCounter::counted() const
+{
+    return m_counted;
+}
+
+uint64_t ReadCounter::unmatchedInsert() const
+{
+    return m_unmatched_insert;
+}
+
+uint64_t ReadCounter::unmatchedBarcodeFw() const
+{
+    return m_unmatched_fw;
+}
+
+uint64_t ReadCounter::unmatchedBarcodeRev() const
+{
+    return m_unmatched_rev;
 }
 
 void ReadCounter::readFile(const std::string &file, ThreadSynchronization *sync)
 {
     auto in = std::ifstream(file);
     std::array<std::string, 4> read;
-    std::unique_lock<std::mutex> qlock(sync->queuemutex, std::defer_lock);
+    std::unique_lock<std::mutex> qlock(sync->inqueuemutex, std::defer_lock);
     sync->eof = false;
     for (int i = 0; in; ++i) {
         auto ri = i % 4;
         std::getline(in, read[ri]);
         if (ri == 3) {
             qlock.lock();
-            sync->queuefull.wait(qlock, [&sync]{return sync->queue.size() < sync->maxsize;});
-            sync->queue.emplace(read[0], read[1], read[2], read[3]);
+            if (sync->inqueue.size() >= sync->maxsize)
+                sync->inqueuefull.wait(qlock, [&sync]{return sync->inqueue.size() < sync->maxsize;});
+            sync->inqueue.emplace(std::move(read[0]), std::move(read[1]), std::move(read[2]), std::move(read[3]));
+            ++m_read;
             qlock.unlock();
-            sync->queueempty.notify_one();
+            sync->inqueueempty.notify_one();
         }
     }
-    sync->queueempty.notify_all();
+    sync->inqueueempty.notify_all();
     sync->eof = true;
+}
+
+void ReadCounter::writeReads(const std::string &prefix, ThreadSynchronization *sync)
+{
+    std::unordered_map<std::string, std::ofstream> files;
+    std::unique_lock<std::mutex> qlock(sync->outqueuemutex, std::defer_lock);
+    while (true) {
+        qlock.lock();
+        if (!sync->outqueue.size())
+            sync->outqueueempty.wait(qlock, [&sync]{return sync->outqueue.size() || sync->finishedMatching;});
+        if (!sync->outqueue.size() && sync->finishedMatching) {
+            qlock.unlock();
+            return;
+        }
+        auto fmatch = sync->outqueue.front();
+        sync->outqueue.pop();
+        qlock.unlock();
+        sync->outqueuefull.notify_one();
+        std::string fname = prefix;
+        if (!fmatch.insertfailed)
+            fname.append(fmatch.barcode_fw).append(fmatch.barcode_rev);
+        else
+            fname.append("noinsert");
+        fname.append(".fastq");
+        if (!files[fname].is_open())
+            files[fname].open(fname);
+        files[fname] << fmatch.read.getName() << std::endl << fmatch.read.getSequence() << std::endl << fmatch.read.getDescription() << std::endl << fmatch.read.getQuality() << std::endl;
+    }
 }
 
 namespace std
@@ -215,21 +293,26 @@ namespace std
 
 void ReadCounter::matchRead(ThreadSynchronization *sync)
 {
-    std::unique_lock<std::mutex> qlock(sync->queuemutex, std::defer_lock);
+    std::unique_lock<std::mutex> qlock(sync->inqueuemutex, std::defer_lock);
+    std::unique_lock<std::mutex> oqlock(sync->outqueuemutex, std::defer_lock);
     decltype(m_counts) localcounts;
+
+    uint64_t unmatched_insert = 0;
+    uint64_t unmatched_fw = 0;
+    uint64_t unmatched_rev = 0;
 
     while (true) {
         qlock.lock();
-        if (!sync->queue.size())
-            sync->queueempty.wait(qlock, [&sync]{return sync->queue.size() || sync->eof;});
-        if (sync->eof && !sync->queue.size()) {
+        if (!sync->inqueue.size())
+            sync->inqueueempty.wait(qlock, [&sync]{return sync->inqueue.size() || sync->eof;});
+        if (sync->eof && !sync->inqueue.size()) {
             qlock.unlock();
             break;
         }
-        Read rd(sync->queue.front());
-        sync->queue.pop();
+        Read rd(sync->inqueue.front());
+        sync->inqueue.pop();
         qlock.unlock();
-        sync->queuefull.notify_one();
+        sync->inqueuefull.notify_one();
 
         try {
             auto insertmatch = m_matcher.match(rd, 1);
@@ -273,18 +356,41 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
 
             if (fwfound && revfound)
                ++localcounts[std::make_pair(fwkey, revkey)][rd.getSequence().substr(insertmatch.first, insertmatch.second)];
-            //TODO: write to mismatches file
+            else {
+                oqlock.lock();
+                if (sync->outqueue.size() >= sync->maxsize)
+                    sync->outqueuefull.wait(oqlock, [&sync]{return sync->outqueue.size() < sync->maxsize;});
+                sync->outqueue.emplace(std::move(rd), false, std::move(fwkey), std::move(revkey));
+                oqlock.unlock();
+                sync->outqueueempty.notify_one();
+
+                if (!fwfound)
+                    ++unmatched_fw;
+                else
+                    ++unmatched_rev;
+            }
         } catch (std::exception &e) {
-            //TODO: write to mismatches file
+            oqlock.lock();
+            if (sync->outqueue.size() >= sync->maxsize)
+                sync->outqueuefull.wait(oqlock, [&sync]{return sync->outqueue.size() < sync->maxsize;});
+            sync->outqueue.emplace(std::move(rd), true, dummykey, dummykey);
+            oqlock.unlock();
+            sync->outqueueempty.notify_one();
+            ++unmatched_insert;
         }
     }
-    sync->countsmutex.lock();
+
+    std::unique_lock<std::mutex> clock(sync->countsmutex);
     for (const auto &codes : localcounts) {
         for (const auto &insert : codes.second) {
             m_counts[codes.first][insert.first] += insert.second;
+            m_counted += insert.second;
         }
     }
-    sync->countsmutex.unlock();
+    m_unmatched_insert += unmatched_insert;
+    m_unmatched_fw += unmatched_fw;
+    m_unmatched_rev += unmatched_rev;
+    clock.unlock();
 }
 
 const std::unordered_map<std::pair<std::string, std::string>, std::unordered_map<std::string, uint64_t>>& ReadCounter::getCounts() const
