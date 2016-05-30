@@ -8,6 +8,8 @@ from libc.stdint cimport *
 
 import csv
 
+import pandas as pd
+
 cdef extern from "cReadCounter.h" nogil:
     cdef cppclass BarcodeSet:
         BarcodeSet(const unordered_map[string, unordered_map[string, vector[string]]]&, const unordered_map[string, unordered_map[string, vector[string]]]) except+
@@ -135,6 +137,31 @@ cdef class PyReadCounter:
 
     def countReads(self, unicode fpath, unicode unmatchedpattern, threads=1):
         self._rdcntr.countReads(fpath.encode(), unmatchedpattern.encode(), threads)
+
+    def asDataFrame(self):
+        insert = []
+        barcode_fw = []
+        barcode_rev = []
+        sequence = []
+        counts = []
+
+        countsdict = self.counts
+        for ins, bcodes in countsdict.items():
+            for codes, seqs in bcodes.items():
+                for seq, cnts in seqs.items():
+                    insert.append(ins)
+                    barcode_fw.append(codes[0])
+                    barcode_rev.append(codes[1])
+                    sequence.append(seq)
+                    counts.append(cnts)
+        df = pd.DataFrame()
+        if len(countsdict) > 1:
+            df['insert'] = insert
+        df['barcode_fw'] = barcode_fw
+        df['barcode_rev'] = barcode_rev
+        df['sequence'] = sequence
+        df['counts'] = counts
+        return df
 
     @property
     def counts(self):

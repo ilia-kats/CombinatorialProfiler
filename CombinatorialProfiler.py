@@ -5,6 +5,11 @@ import os.path
 import subprocess
 import csv
 
+import pandas as pd
+
+import Bio.Seq
+import Bio.Alphabet
+
 from readcounter.readcounter import PyBarcodeSet, PyReadCounter
 
 def readInserts(ins):
@@ -88,10 +93,8 @@ if __name__ == '__main__':
     if not os.path.isdir(unmatcheddir):
         os.makedirs(unmatcheddir)
     counter = PyReadCounter(readInserts(args.insert_sequence), fwcodes, revcodes)
-    counter.countReads(os.path.join(args.outdir, mergedfqname), unmatcheddir + '/', args.threads)
-    print(counter.counts)
-    print("read:", counter.read)
-    print("counted:", counter.counted)
-    print("inserts w/o barcodes", counter.inserts_without_barcodes)
-    print("unmatched inserts", counter.unmatched_insert)
-    print("unmatched barcodes", counter.unmatched_barcode_fw)
+    counter.countReads(os.path.join(args.outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped_"), args.threads)
+
+    df = counter.asDataFrame()
+    df['translation'] = df.apply(lambda x: str(Bio.Seq.Seq(str(x['sequence']), Bio.Alphabet.generic_dna).translate()), axis=1, reduce=True)
+    df.to_csv(os.path.join(args.outdir, "raw_counts.csv"), index=False, encoding='utf-8')

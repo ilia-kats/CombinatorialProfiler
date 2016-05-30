@@ -78,6 +78,8 @@ Read Read::reverseComplement() const
 {
     std::string seq2;
     std::string qual;
+    seq2.reserve(m_sequence.size());
+    qual.reserve(m_quality.size());
     std::transform(m_sequence.crbegin(), m_sequence.crend(), std::inserter(seq2, seq2.begin()), [](const decltype(m_sequence)::value_type &c) -> decltype(m_sequence)::value_type {
         switch (c) {
             case 'A':
