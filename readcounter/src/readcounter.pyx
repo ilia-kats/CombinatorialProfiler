@@ -10,18 +10,19 @@ import csv
 
 cdef extern from "cReadCounter.h" nogil:
     cdef cppclass BarcodeSet:
-        BarcodeSet(const unordered_map[string, vector[string]]&, const unordered_map[string, vector[string]]) except+
+        BarcodeSet(const unordered_map[string, unordered_map[string, vector[string]]]&, const unordered_map[string, unordered_map[string, vector[string]]]) except+
 
-        const unordered_map[string, vector[string]] fw
-        const unordered_map[string, vector[string]] rev
+        const unordered_map[string, unordered_map[string, vector[string]]] fw
+        const unordered_map[string, unordered_map[string, vector[string]]] rev
 
     cdef cppclass ReadCounter:
-        ReadCounter(const string&, BarcodeSet*, BarcodeSet*) except+
+        ReadCounter(const unordered_map[string, string]&, BarcodeSet*, BarcodeSet*) except+
         void countReads(const string&, const string&, int)
-        const unordered_map[pair[string, string], unordered_map[string, uint64_t]]& getCounts()
+        const unordered_map[string, unordered_map[pair[string, string], unordered_map[string, uint64_t]]]& getCounts()
         uint64_t read()
         uint64_t counted()
         uint64_t unmatchedInsert()
+        uint64_t insertsWithoutBarcodes()
         uint64_t unmatchedBarcodeFw()
         uint64_t unmatchedBarcodeRev()
 
@@ -40,18 +41,27 @@ cdef class PyBarcodeSet:
             reader = csv.reader(bcodefile, dialect)
             if has_header:
                 next(reader)
-            codes = {}
+            codes = dict()
             for r in reader:
-                codes[r[0]] = r[1].upper().encode()
+                if len(r) > 2:
+                    insname = r[2]
+                else:
+                    insname = ""
+                if insname not in codes:
+                    codes[insname] = {}
+                codes[insname][r[0]] = r[1].upper().encode()
         pyfw = self._generate_unique(codes)
         pyrev = self._make_reverse(pyfw)
 
-        cdef unordered_map[string, vector[string]] fw
-        cdef unordered_map[string, vector[string]] rev
-        for k,v in pyfw.items():
-            fw[k.encode()] = v
-        for k,v in pyrev.items():
-            rev[k.encode()] = v
+        cdef unordered_map[string, unordered_map[string, vector[string]]] fw
+        cdef unordered_map[string, unordered_map[string, vector[string]]] rev
+
+        for i, b in pyfw.items():
+            for k,v in b.items():
+                fw[i.encode()][k.encode()] = v
+        for i,b in pyrev.items():
+            for k,v in b.items():
+                rev[i.encode()][k.encode()] = v
         self._bset = new BarcodeSet(fw, rev)
 
     def __dealloc__(self):
@@ -59,23 +69,27 @@ cdef class PyBarcodeSet:
 
     def _generate_unique(self, codes):
         fw = {}
-        for k, b in codes.items():
-            bcodes = []
-            for s in range(0, len(b)):
-                found = False
-                for key, barcode in codes.items():
-                    if not key == k and barcode.find(b[s:]) != -1:
-                        found = True
-                        break
-                if not found:
-                    bcodes.append(b[s:])
-            fw[k] = tuple(bcodes)
+        for i, c in codes.items():
+            fw[i] = {}
+            for k,b in c.items():
+                bcodes = []
+                for s in range(0, len(b)):
+                    found = False
+                    for key, barcode in codes[i].items():
+                        if not key == k and barcode.find(b[s:]) != -1:
+                            found = True
+                            break
+                    if not found:
+                        bcodes.append(b[s:])
+                fw[i][k] = tuple(bcodes)
         return fw
 
     def _make_reverse(self, fw):
         rev = {}
-        for k, v in fw.items():
-            rev[k] = tuple(PyBarcodeSet.reverse_compl(bcode) for bcode in v)
+        for i, b in fw.items():
+            rev[i] = {}
+            for k,v in b.items():
+                rev[i][k] = tuple(PyBarcodeSet.reverse_compl(bcode) for bcode in v)
         return rev
 
     @staticmethod
@@ -92,11 +106,11 @@ cdef class PyBarcodeSet:
 
 cdef class PyReadCounter:
     cdef ReadCounter *_rdcntr
-    cdef readonly unicode insertseq
+    cdef readonly dict insertseq
     cdef readonly PyBarcodeSet fw
     cdef readonly PyBarcodeSet rev
 
-    def __cinit__(self, unicode insertseq, PyBarcodeSet barcodes_fw, PyBarcodeSet barcodes_rev):
+    def __cinit__(self, dict insertseq, PyBarcodeSet barcodes_fw, PyBarcodeSet barcodes_rev):
         self.insertseq = insertseq
         self.fw = barcodes_fw
         self.rev = barcodes_rev
@@ -111,7 +125,10 @@ cdef class PyReadCounter:
             rev = NULL
         else:
             rev = barcodes_rev._bset
-        self._rdcntr = new ReadCounter(insertseq.encode(), fw, rev)
+        cdef unordered_map[string, string] seqs
+        for k, v in insertseq.items():
+            seqs[k.encode()] = v.encode()
+        self._rdcntr = new ReadCounter(seqs, fw, rev)
 
     def __dealloc__(self):
         del self._rdcntr
@@ -134,6 +151,10 @@ cdef class PyReadCounter:
     @property
     def unmatched_insert(self):
         return self._rdcntr.unmatchedInsert()
+
+    @property
+    def inserts_without_barcodes(self):
+        return self._rdcntr.insertsWithoutBarcodes()
 
     @property
     def unmatched_barcode_fw(self):

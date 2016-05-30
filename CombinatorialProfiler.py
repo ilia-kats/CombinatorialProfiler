@@ -5,7 +5,25 @@ import os.path
 import subprocess
 import csv
 
-from readcounter.readcounter import PyBarcodeSet
+from readcounter.readcounter import PyBarcodeSet, PyReadCounter
+
+def readInserts(ins):
+    inserts = {}
+    if os.path.isfile(ins):
+        with open(ins) as insfile:
+            sample = insfile.read(1024)
+            insfile.seek(0)
+            s = csv.Sniffer()
+            dialect = s.sniff(sample)
+            has_header = s.has_header(sample)
+            reader = csv.reader(insfile, dialect)
+            if has_header:
+                next(reader)
+            for r in reader:
+                inserts[r[0]] = r[1]
+    else:
+        inserts[''] = ins
+    return inserts
 
 if __name__ == '__main__':
     import argparse
@@ -21,13 +39,14 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--threads', required=False, default=1, help='Number of threads to use',  type=int)
     parser.add_argument('-f', '--forward-barcodes', required=False, help='File containing forward barcodes. Must be csv-like with column 1 containing the name and column 2 the barcode')
     parser.add_argument('-r', '--reverse-barcodes', required=False, help='File containing reverse barcodes. Must be csv-like with column 1 containing the name and column 2 the barcode')
+    parser.add_argument('-i', '--insert-sequence', required=False, help='Either an insert sequence to match against or path to a csv-like file with column 1 containing the name and column 2 the sequence. Variable region must be marked with a sequence of Ns')
 
     args = parser.parse_args()
 
     fqcoutdir = os.path.join(args.outdir,'fastqc')
     if not os.path.isdir(fqcoutdir):
         os.makedirs(fqcoutdir)
-    subprocess.run([args.fastqc, '--outdir=%s' % fqcoutdir, *args.fastq])
+    #subprocess.run([args.fastqc, '--outdir=%s' % fqcoutdir, *args.fastq])
 
     fqnames = None
     bowtiefqname = None
@@ -49,14 +68,30 @@ if __name__ == '__main__':
         bowtiefqname = 'sequence_%.fastq'
         mergedfqname = 'sequence'
 
-    with open(os.path.join(args.outdir, 'phix_alignment_summary.txt'), 'w') as phix_summary:
-        subprocess.run([args.bowtie, '-p', str(args.threads), '--local', '--un-conc', os.path.join(args.outdir, bowtiefqname), '-x', args.phix_index, '-1', args.fastq[0], '-2', args.fastq[1], '-S', os.path.join(args.outdir, 'phix_alignment.sam'), '--met-file', os.path.join(args.outdir, 'phix_alignment_metrics.txt')], stderr=phix_summary)
+    #with open(os.path.join(args.outdir, 'phix_alignment_summary.txt'), 'w') as phix_summary:
+        #subprocess.run([args.bowtie, '-p', str(args.threads), '--local', '--un-conc', os.path.join(args.outdir, bowtiefqname), '-x', args.phix_index, '-1', args.fastq[0], '-2', args.fastq[1], '-S', os.path.join(args.outdir, 'phix_alignment.sam'), '--met-file', os.path.join(args.outdir, 'phix_alignment_metrics.txt')], stderr=phix_summary)
 
-    with open(os.path.join(args.outdir, 'pear_summary.txt'), 'w') as pear_summary:
-        subprocess.run([args.pear, '-j', str(args.threads), '-f', os.path.join(args.outdir, fqnames[0]), '-r', os.path.join(args.outdir, fqnames[1]), '-o', os.path.join(args.outdir, mergedfqname)], stdout=pear_summary)
+    #with open(os.path.join(args.outdir, 'pear_summary.txt'), 'w') as pear_summary:
+        #subprocess.run([args.pear, '-j', str(args.threads), '-f', os.path.join(args.outdir, fqnames[0]), '-r', os.path.join(args.outdir, fqnames[1]), '-o', os.path.join(args.outdir, mergedfqname)], stdout=pear_summary)
     mergedfqname += '.assembled.fastq'
 
     if args.forward_barcodes:
         fwcodes = PyBarcodeSet(args.forward_barcodes)
+    else:
+        fwcodes = None
     if args.reverse_barcodes:
         revcodes = PyBarcodeSet(args.reverse_barcodes)
+    else:
+        revcodes = None
+
+    unmatcheddir = os.path.join(args.outdir, "%s_unmapped" % mergedfqname)
+    if not os.path.isdir(unmatcheddir):
+        os.makedirs(unmatcheddir)
+    counter = PyReadCounter(readInserts(args.insert_sequence), fwcodes, revcodes)
+    counter.countReads(os.path.join(args.outdir, mergedfqname), unmatcheddir + '/', args.threads)
+    print(counter.counts)
+    print("read:", counter.read)
+    print("counted:", counter.counted)
+    print("inserts w/o barcodes", counter.inserts_without_barcodes)
+    print("unmatched inserts", counter.unmatched_insert)
+    print("unmatched barcodes", counter.unmatched_barcode_fw)

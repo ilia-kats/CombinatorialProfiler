@@ -17,10 +17,10 @@ template<> struct hash<std::pair<std::string, std::string>>
 class BarcodeSet
 {
 public:
-    BarcodeSet(const std::unordered_map<std::string, std::vector<std::string>>&, const std::unordered_map<std::string, std::vector<std::string>>&);
+    BarcodeSet(const std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>>&, const std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>>&);
 
-    const std::unordered_map<std::string, std::vector<std::string>> fw;
-    const std::unordered_map<std::string, std::vector<std::string>> rev;
+    const std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>> fw;
+    const std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>> rev;
 
 };
 
@@ -73,29 +73,32 @@ private:
 class ReadCounter
 {
 public:
-    ReadCounter(const std::string&, BarcodeSet *fw=nullptr, BarcodeSet *rev=nullptr);
+    ReadCounter(const std::unordered_map<std::string, std::string>&, BarcodeSet *fw=nullptr, BarcodeSet *rev=nullptr);
     void countReads(const std::string&, const std::string&, int threads=1);
-    const std::unordered_map<std::pair<std::string, std::string>, std::unordered_map<std::string, uint64_t>>& getCounts() const;
+    const std::unordered_map<std::string, std::unordered_map<std::pair<std::string, std::string>, std::unordered_map<std::string, uint64_t>>>& getCounts() const;
 
     uint64_t read() const;
     uint64_t counted() const;
     uint64_t unmatchedInsert() const;
+    uint16_t insertsWithoutBarcodes() const;
     uint64_t unmatchedBarcodeFw() const;
     uint64_t unmatchedBarcodeRev() const;
 
 private:
     struct ThreadSynchronization;
-    std::unordered_map<std::pair<std::string, std::string>, std::unordered_map<std::string, uint64_t>> m_counts;
+    std::unordered_map<std::string, std::unordered_map<std::pair<std::string, std::string>, std::unordered_map<std::string, uint64_t>>> m_counts;
 
     uint64_t m_read;
     uint64_t m_counted;
     uint64_t m_unmatched_insert;
+    uint16_t m_unmatched_nobarcode;
     uint64_t m_unmatched_fw;
     uint16_t m_unmatched_rev;
 
-    SequenceMatcher m_matcher;
     BarcodeSet *m_barcodes_fw;
     BarcodeSet *m_barcodes_rev;
+
+    std::unordered_map<std::string, SequenceMatcher> m_matcher;
 
     void readFile(const std::string&, ThreadSynchronization*);
     void matchRead(ThreadSynchronization*);
