@@ -95,6 +95,7 @@ if __name__ == '__main__':
     counter = PyReadCounter(readInserts(args.insert_sequence), fwcodes, revcodes)
     counter.countReads(os.path.join(args.outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped_"), args.threads)
 
-    df = counter.asDataFrame()
-    df['translation'] = df.apply(lambda x: str(Bio.Seq.Seq(str(x['sequence']), Bio.Alphabet.generic_dna).translate()), axis=1, reduce=True)
-    df.to_csv(os.path.join(args.outdir, "raw_counts.csv"), index=False, encoding='utf-8')
+    df = counter.asDataFrames()
+    for i, v in df.items():
+        v['translation'] = v.apply(lambda x: str(Bio.Seq.Seq(str(x['sequence']), Bio.Alphabet.generic_dna).translate()), axis=1, reduce=True)
+        v.to_csv(os.path.join(args.outdir, "%s_raw_counts.csv" % i), index=False, encoding='utf-8')

@@ -138,15 +138,16 @@ cdef class PyReadCounter:
     def countReads(self, unicode fpath, unicode unmatchedpattern, threads=1):
         self._rdcntr.countReads(fpath.encode(), unmatchedpattern.encode(), threads)
 
-    def asDataFrame(self):
-        insert = []
-        barcode_fw = []
-        barcode_rev = []
-        sequence = []
-        counts = []
+    def asDataFrames(self):
+        frames = {}
 
         countsdict = self.counts
         for ins, bcodes in countsdict.items():
+            insert = []
+            barcode_fw = []
+            barcode_rev = []
+            sequence = []
+            counts = []
             for codes, seqs in bcodes.items():
                 for seq, cnts in seqs.items():
                     insert.append(ins)
@@ -154,14 +155,15 @@ cdef class PyReadCounter:
                     barcode_rev.append(codes[1])
                     sequence.append(seq)
                     counts.append(cnts)
-        df = pd.DataFrame()
-        if len(countsdict) > 1:
-            df['insert'] = insert
-        df['barcode_fw'] = barcode_fw
-        df['barcode_rev'] = barcode_rev
-        df['sequence'] = sequence
-        df['counts'] = counts
-        return df
+            df = pd.DataFrame()
+            if len(countsdict) > 1:
+                df['insert'] = insert
+            df['barcode_fw'] = barcode_fw
+            df['barcode_rev'] = barcode_rev
+            df['sequence'] = sequence
+            df['counts'] = counts
+            frames[ins] = df
+        return frames
 
     @property
     def counts(self):
