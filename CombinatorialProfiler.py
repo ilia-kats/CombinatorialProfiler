@@ -10,20 +10,69 @@ import pandas as pd
 import Bio.Seq
 import Bio.Alphabet
 
-from readcounter.readcounter import PyBarcodeSet, PyReadCounter
+from readcounter.readcounter import PyReadCounter
+
+def get_csv_reader(csvfile):
+    sample = csvfile.read(1024)
+    csvfile.seek(0)
+    s = csv.Sniffer()
+    dialect = s.sniff(sample)
+    has_header = s.has_header(sample)
+    reader = csv.reader(csvfile, dialect)
+    if has_header:
+        next(reader)
+    return reader
+
+def readBarcodes(fpath, reverse=False):
+    ttable = str.maketrans('ATGC', 'TACG')
+
+    with open(fpath) as bcodefile:
+        reader = get_csv_reader(bcodefile)
+        codes = dict()
+        for r in reader:
+            if len(r) > 2:
+                insname = r[2]
+            else:
+                insname = ""
+            if insname not in codes:
+                codes[insname] = {}
+            codes[insname][r[0]] = r[1].upper()
+
+    ccodes = {}
+    for i, c in codes.items():
+        ccodes[i] = {}
+        for k,b in c.items():
+            bcodes = []
+            for s in range(0, len(b)):
+                found = False
+                for key, barcode in codes[i].items():
+                    if not key == k and barcode.find(b[s:]) != -1:
+                        found = True
+                        break
+                if not found:
+                    bcodes.append(b[s:])
+            ccodes[i][k] = tuple(bcodes)
+
+    if reverse:
+        for i, b in ccodes.items():
+            for k,v in b.items():
+                b[k] = tuple(bcode.translate(ttable)[::-1] for bcode in v)
+
+    return ccodes
+
+def readNamedInserts(ins):
+    inserts = {'': {}}
+    with open(ins) as insfile:
+        reader = get_csv_reader(insfile)
+        for r in reader:
+            inserts[''][r[0]] = r[1]
+    return inserts
 
 def readInserts(ins):
     inserts = {}
     if os.path.isfile(ins):
         with open(ins) as insfile:
-            sample = insfile.read(1024)
-            insfile.seek(0)
-            s = csv.Sniffer()
-            dialect = s.sniff(sample)
-            has_header = s.has_header(sample)
-            reader = csv.reader(insfile, dialect)
-            if has_header:
-                next(reader)
+            reader = get_csv_reader(insfile)
             for r in reader:
                 inserts[r[0]] = r[1]
     else:
@@ -45,6 +94,7 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--forward-barcodes', required=False, help='File containing forward barcodes. Must be csv-like with column 1 containing the name and column 2 the barcode')
     parser.add_argument('-r', '--reverse-barcodes', required=False, help='File containing reverse barcodes. Must be csv-like with column 1 containing the name and column 2 the barcode')
     parser.add_argument('-i', '--insert-sequence', required=False, help='Either an insert sequence to match against or path to a csv-like file with column 1 containing the name and column 2 the sequence. Variable region must be marked with a sequence of Ns')
+    parser.add_argument('-n', '--named-inserts', required=False, help='Named sequences of allowed variable sequences within the insert. Csv-like file with the first column containing the name and the second column the sequence')
 
     args = parser.parse_args()
 
@@ -81,21 +131,30 @@ if __name__ == '__main__':
     mergedfqname += '.assembled.fastq'
 
     if args.forward_barcodes:
-        fwcodes = PyBarcodeSet(args.forward_barcodes)
+        fwcodes = readBarcodes(args.forward_barcodes)
     else:
         fwcodes = None
     if args.reverse_barcodes:
-        revcodes = PyBarcodeSet(args.reverse_barcodes)
+        revcodes = readBarcodes(args.reverse_barcodes, True)
     else:
         revcodes = None
+
+    if args.named_inserts:
+        ninserts = readNamedInserts(args.named_inserts)
+    else:
+        ninserts = None
 
     unmatcheddir = os.path.join(args.outdir, "%s_unmapped" % mergedfqname)
     if not os.path.isdir(unmatcheddir):
         os.makedirs(unmatcheddir)
-    counter = PyReadCounter(readInserts(args.insert_sequence), fwcodes, revcodes)
+    counter = PyReadCounter(readInserts(args.insert_sequence), fwcodes, revcodes, ninserts)
     counter.countReads(os.path.join(args.outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped_"), args.threads)
 
     df = counter.asDataFrames()
     for i, v in df.items():
+        if not len(i):
+            prefix = ''
+        else:
+            prefix = "%s_" % i
         v['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in v.itertuples()])
-        v.to_csv(os.path.join(args.outdir, "%s_raw_counts.csv" % i), index=False, encoding='utf-8')
+        v.to_csv(os.path.join(args.outdir, "%sraw_counts.csv" % prefix), index=False, encoding='utf-8')

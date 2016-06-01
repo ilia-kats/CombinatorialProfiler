@@ -2,6 +2,7 @@
 #define READCOUNTER_H
 
 #include <unordered_map>
+#include <unordered_set>
 #include <functional>
 #include <string>
 #include <vector>
@@ -14,15 +15,9 @@ template<> struct hash<std::pair<std::string, std::string>>
 };
 }
 
-class BarcodeSet
-{
-public:
-    BarcodeSet(const std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>>&, const std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>>&);
+typedef std::unordered_map<std::string, std::unordered_set<std::string>> InsertSet;
 
-    const std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>> fw;
-    const std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>> rev;
-
-};
+typedef std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>> BarcodeSet;
 
 class Read
 {
@@ -73,14 +68,13 @@ private:
 class ReadCounter
 {
 public:
-    ReadCounter(const std::unordered_map<std::string, std::string>&, BarcodeSet *fw=nullptr, BarcodeSet *rev=nullptr);
+    ReadCounter(const std::unordered_map<std::string, std::string>&, BarcodeSet *fw=nullptr, BarcodeSet *rev=nullptr, InsertSet *ins = nullptr);
     void countReads(const std::string&, const std::string&, int threads=1);
     const std::unordered_map<std::string, std::unordered_map<std::pair<std::string, std::string>, std::unordered_map<std::string, uint64_t>>>& getCounts() const;
 
     uint64_t read() const;
     uint64_t counted() const;
     uint64_t unmatchedInsert() const;
-    uint16_t insertsWithoutBarcodes() const;
     uint64_t unmatchedBarcodeFw() const;
     uint64_t unmatchedBarcodeRev() const;
 
@@ -91,12 +85,12 @@ private:
     uint64_t m_read;
     uint64_t m_counted;
     uint64_t m_unmatched_insert;
-    uint16_t m_unmatched_nobarcode;
     uint64_t m_unmatched_fw;
     uint16_t m_unmatched_rev;
 
     BarcodeSet *m_barcodes_fw;
     BarcodeSet *m_barcodes_rev;
+    InsertSet *m_inserts;
 
     std::unordered_map<std::string, SequenceMatcher> m_matcher;
 

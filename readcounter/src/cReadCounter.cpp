@@ -11,10 +11,6 @@
 #include <atomic>
 #include <thread>
 
-BarcodeSet::BarcodeSet(const std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>> &f, const std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>> &r)
-: fw(f), rev(r)
-{}
-
 Read::Read()
 {}
 
@@ -156,8 +152,8 @@ std::pair<std::string::size_type, std::string::size_type> SequenceMatcher::match
     return std::make_pair(start, downstream.first - start);
 }
 
-ReadCounter::ReadCounter(const std::unordered_map<std::string, std::string> &insertseqs, BarcodeSet *fw, BarcodeSet *rev)
-: m_read(0), m_counted(0), m_unmatched_insert(0), m_unmatched_nobarcode(0), m_unmatched_fw(0), m_unmatched_rev(0), m_barcodes_fw(fw), m_barcodes_rev(rev)
+ReadCounter::ReadCounter(const std::unordered_map<std::string, std::string> &insertseqs, BarcodeSet *fw, BarcodeSet *rev, InsertSet *ins)
+: m_read(0), m_counted(0), m_unmatched_insert(0), m_unmatched_fw(0), m_unmatched_rev(0), m_barcodes_fw(fw), m_barcodes_rev(rev), m_inserts(ins)
 {
     for (const auto &ins : insertseqs) {
         m_matcher.emplace(ins);
@@ -168,7 +164,7 @@ struct ReadCounter::ThreadSynchronization
 {
     struct FailedMatch
     {
-        enum class Fail {noFail, insertFailed, noBarcodeForInsert, fwBarcodeFailed, revBarcodeFailed};
+        enum class Fail {noFail, insertFailed, fwBarcodeFailed, revBarcodeFailed, insertMatchFailed};
         Read read;
         Fail fail;
         std::string insert_name;
@@ -229,11 +225,6 @@ uint64_t ReadCounter::unmatchedInsert() const
     return m_unmatched_insert;
 }
 
-uint16_t ReadCounter::insertsWithoutBarcodes() const
-{
-    return m_unmatched_nobarcode;
-}
-
 uint64_t ReadCounter::unmatchedBarcodeFw() const
 {
     return m_unmatched_fw;
@@ -288,16 +279,16 @@ void ReadCounter::writeReads(const std::string &prefix, ThreadSynchronization *s
             case ThreadSynchronization::FailedMatch::Fail::insertFailed:
                 fname.append("noinsert");
                 break;
-            case ThreadSynchronization::FailedMatch::Fail::noBarcodeForInsert:
-                fname.append(fmatch.insert_name);
-                break;
             case ThreadSynchronization::FailedMatch::Fail::fwBarcodeFailed:
             case ThreadSynchronization::FailedMatch::Fail::revBarcodeFailed:
-                fname.append(fmatch.barcode_fw).append(fmatch.barcode_rev);
+            case ThreadSynchronization::FailedMatch::Fail::insertMatchFailed:
+                fname.append(fmatch.barcode_fw).append("_").append(fmatch.barcode_rev);
                 break;
             default:
                 break;
         }
+        if (fmatch.fail == ThreadSynchronization::FailedMatch::Fail::insertMatchFailed)
+            fname.append("_unmatched");
         fname.append(".fastq");
         if (!files[fname].is_open())
             files[fname].open(fname);
@@ -322,7 +313,6 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
     decltype(m_counts) localcounts;
 
     uint64_t unmatched_insert = 0;
-    uint64_t unmatched_nobarcode = 0;
     uint64_t unmatched_fw = 0;
     uint64_t unmatched_rev = 0;
 
@@ -348,11 +338,11 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
                 auto insertmatch = i.second.match(rd, 1);
                 bool fwfound = true;
                 bool revfound = true;
-                if (m_barcodes_fw == nullptr)
+                if (!m_barcodes_fw || !m_barcodes_fw->count(i.first))
                     fwkey = dummykey;
                 else {
                     fwfound = false;
-                    for (const auto &code : m_barcodes_fw->fw.at(i.first)) {
+                    for (const auto &code : m_barcodes_fw->at(i.first)) {
                         for (const auto &seq : code.second) {
                             if (!rd.getSequence().compare(0, seq.size(), seq)) {
                                 fwfound = true;
@@ -364,11 +354,11 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
                             break;
                     }
                 }
-                if (m_barcodes_rev == nullptr)
+                if (!m_barcodes_rev || !m_barcodes_rev->count(i.first))
                     revkey = dummykey;
                 else {
                     revfound = false;
-                    for (const auto &code : m_barcodes_rev->rev.at(i.first)) {
+                    for (const auto &code : m_barcodes_rev->at(i.first)) {
                         for (const auto &seq : code.second) {
                             auto rdseq = rd.getSequence();
                             if (!rdseq.compare(rdseq.size() - seq.size(), seq.size(), seq)) {
@@ -383,8 +373,13 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
                 }
 
                 if (fwfound && revfound) {
-                    ++localcounts[i.first][std::make_pair(fwkey, revkey)][rd.getSequence().substr(insertmatch.first, insertmatch.second)];
-                    fail = ThreadSynchronization::FailedMatch::Fail::noFail;
+                    auto seq = rd.getSequence().substr(insertmatch.first, insertmatch.second);
+                    if (!m_inserts || !m_inserts->count(i.first) || m_inserts->at(i.first).count(seq)) {
+                        ++localcounts[i.first][std::make_pair(fwkey, revkey)][seq];
+                        fail = ThreadSynchronization::FailedMatch::Fail::noFail;
+                    } else {
+                        fail = ThreadSynchronization::FailedMatch::Fail::insertMatchFailed;
+                    }
                 }
                 else if (!fwfound) {
                     ++unmatched_fw;
@@ -393,10 +388,6 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
                     ++unmatched_rev;
                     fail = ThreadSynchronization::FailedMatch::Fail::revBarcodeFailed;
                 }
-                break;
-            } catch (std::out_of_range &e) {
-                fail = ThreadSynchronization::FailedMatch::Fail::noBarcodeForInsert;
-                ++unmatched_nobarcode;
                 break;
             } catch (std::exception &e) {
                 fail = ThreadSynchronization::FailedMatch::Fail::insertFailed;
@@ -425,7 +416,6 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
         }
     }
     m_unmatched_insert += unmatched_insert;
-    m_unmatched_nobarcode += unmatched_nobarcode;
     m_unmatched_fw += unmatched_fw;
     m_unmatched_rev += unmatched_rev;
     clock.unlock();
