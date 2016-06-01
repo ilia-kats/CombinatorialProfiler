@@ -97,5 +97,5 @@ if __name__ == '__main__':
 
     df = counter.asDataFrames()
     for i, v in df.items():
-        v['translation'] = v.apply(lambda x: str(Bio.Seq.Seq(str(x['sequence']), Bio.Alphabet.generic_dna).translate()), axis=1, reduce=True)
+        v['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in v.itertuples()])
         v.to_csv(os.path.join(args.outdir, "%s_raw_counts.csv" % i), index=False, encoding='utf-8')
