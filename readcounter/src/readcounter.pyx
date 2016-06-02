@@ -107,8 +107,7 @@ cdef class PyReadCounter:
                     sequence.append(seq)
                     counts.append(cnts)
             df = pd.DataFrame()
-            if len(countsdict) > 1:
-                df['insert'] = pd.Series(insert, dtype='category')
+            df['insert'] = pd.Series(insert, dtype='category')
             df['barcode_fw'] = pd.Series(barcode_fw, dtype='category')
             df['barcode_rev'] = pd.Series(barcode_rev, dtype='category')
             df['sequence'] = sequence

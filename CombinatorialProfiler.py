@@ -12,6 +12,18 @@ import Bio.Alphabet
 
 from readcounter.readcounter import PyReadCounter
 
+def dict_merge(dicts):
+    dct = dicts.pop()
+    while len(dicts):
+        merge_dct = dicts.pop()
+        for k, v in merge_dct.iteritems():
+            if (k in dct and isinstance(dct[k], dict)
+                    and isinstance(merge_dct[k], dict)):
+                dict_merge(dct[k], merge_dct[k])
+            else:
+                dct[k] = merge_dct[k]
+    return dct
+
 def get_csv_reader(csvfile):
     sample = csvfile.read(1024)
     csvfile.seek(0)
@@ -23,21 +35,26 @@ def get_csv_reader(csvfile):
         next(reader)
     return reader
 
-def readBarcodes(fpath, reverse=False):
-    ttable = str.maketrans('ATGC', 'TACG')
+def split_spec(spec):
+    sep = spec.find(':')
+    if sep <= 0:
+        return ('', spec)
+    else:
+        return (spec[:sep], spec[sep + 1:])
 
-    with open(fpath) as bcodefile:
-        reader = get_csv_reader(bcodefile)
-        codes = dict()
-        for r in reader:
-            if len(r) > 2:
-                insname = r[2]
-            else:
-                insname = ""
-            if insname not in codes:
-                codes[insname] = {}
-            codes[insname][r[0]] = r[1].upper()
+def get_named_reader(spec):
+    if os.path.isfile(spec):
+        f = open(spec, newline='')
+        return (None, get_csv_reader(f), f)
+    else:
+        name, fpath = split_spec(spec)
+        if not os.path.isfile(fpath):
+            raise RuntimeError("Invalid file specification")
+        else:
+            f = open(fpath, newline='')
+            return (name, get_csv_reader(f), f)
 
+def generateBarcodes(codes):
     ccodes = {}
     for i, c in codes.items():
         ccodes[i] = {}
@@ -52,20 +69,37 @@ def readBarcodes(fpath, reverse=False):
                 if not found:
                     bcodes.append(b[s:])
             ccodes[i][k] = tuple(bcodes)
+    return ccodes
+
+def readBarcodes(fpath, reverse=False):
+    ttable = str.maketrans('ATGC', 'TACG')
+
+    name, reader, f = get_named_reader(fpath)
+    codes = {}
+    for r in reader:
+        if len(r) > 2 and not name:
+            insname = r[2]
+        elif name:
+            insname = name
+        else:
+            insname = ""
+        if insname not in codes:
+            codes[insname] = {}
+        codes[insname][r[0]] = r[1].upper()
 
     if reverse:
-        for i, b in ccodes.items():
+        for i, b in codes.items():
             for k,v in b.items():
                 b[k] = tuple(bcode.translate(ttable)[::-1] for bcode in v)
 
-    return ccodes
+    return codes
 
 def readNamedInserts(ins):
-    inserts = {'': {}}
-    with open(ins) as insfile:
-        reader = get_csv_reader(insfile)
-        for r in reader:
-            inserts[''][r[0]] = r[1]
+    inserts = {}
+    name, reader, f = get_named_reader(ins)
+    inserts[name] = {}
+    for r in reader:
+        inserts[name][r[0]] = r[1]
     return inserts
 
 def readInserts(ins):
@@ -76,8 +110,23 @@ def readInserts(ins):
             for r in reader:
                 inserts[r[0]] = r[1]
     else:
-        inserts[''] = ins
+        name, insert = split_spec(ins)
+        inserts[name] = insert
     return inserts
+
+def mergeInserts(ins, barcodes_fw, barcodes_rev):
+    if len(ins) == 1 and None in ins:
+        keys = []
+        if barcodes_fw is not None:
+            keys.extend(barcodes_fw.keys())
+        if barcodes_rev is not None:
+            keys.extend(barcodes_rev.keys())
+        keys = set(keys)
+        insseq = ins[None]
+        ins = {}
+        for k in keys:
+            ins[k] = insseq
+    return ins
 
 if __name__ == '__main__':
     import argparse
@@ -91,10 +140,10 @@ if __name__ == '__main__':
     parser.add_argument('--phix_index', required=True, help='Path to the bowtie index of the PhiX genome.')
     parser.add_argument('--pear', required=True, help='Path to the PEAR binary. If not given, pear will be assumed to be in PATH')
     parser.add_argument('-t', '--threads', required=False, default=1, help='Number of threads to use',  type=int)
-    parser.add_argument('-f', '--forward-barcodes', required=False, help='File containing forward barcodes. Must be csv-like with column 1 containing the name and column 2 the barcode')
-    parser.add_argument('-r', '--reverse-barcodes', required=False, help='File containing reverse barcodes. Must be csv-like with column 1 containing the name and column 2 the barcode')
-    parser.add_argument('-i', '--insert-sequence', required=False, help='Either an insert sequence to match against or path to a csv-like file with column 1 containing the name and column 2 the sequence. Variable region must be marked with a sequence of Ns')
-    parser.add_argument('-n', '--named-inserts', required=False, help='Named sequences of allowed variable sequences within the insert. Csv-like file with the first column containing the name and the second column the sequence')
+    parser.add_argument('-f', '--forward-barcodes', required=False, action='append', help='File containing forward barcodes. Must be csv-like with column 1 containing the name and column 2 the barcode')
+    parser.add_argument('-r', '--reverse-barcodes', required=False, action='append', help='File containing reverse barcodes. Must be csv-like with column 1 containing the name and column 2 the barcode')
+    parser.add_argument('-i', '--insert-sequence', required=False, action='append', help='Either an insert sequence to match against or path to a csv-like file with column 1 containing the name and column 2 the sequence. Variable region must be marked with a sequence of Ns')
+    parser.add_argument('-n', '--named-inserts', required=False, action='append', help='Named sequences of allowed variable sequences within the insert. Csv-like file with the first column containing the name and the second column the sequence')
 
     args = parser.parse_args()
 
@@ -131,23 +180,23 @@ if __name__ == '__main__':
     mergedfqname += '.assembled.fastq'
 
     if args.forward_barcodes:
-        fwcodes = readBarcodes(args.forward_barcodes)
+        fwcodes = generateBarcodes(dict_merge([readBarcodes(c) for c in args.forward_barcodes]))
     else:
         fwcodes = None
     if args.reverse_barcodes:
-        revcodes = readBarcodes(args.reverse_barcodes, True)
+        revcodes = generateBarcodes(dict_merge([readBarcodes(c, True) for c in args.reverse_barcodes]))
     else:
         revcodes = None
 
     if args.named_inserts:
-        ninserts = readNamedInserts(args.named_inserts)
+        ninserts = mergeInserts(dict_merge([readNamedInserts(i) for i in args.named_inserts]), fwcodes, revcodes)
     else:
         ninserts = None
 
     unmatcheddir = os.path.join(args.outdir, "%s_unmapped" % mergedfqname)
     if not os.path.isdir(unmatcheddir):
         os.makedirs(unmatcheddir)
-    counter = PyReadCounter(readInserts(args.insert_sequence), fwcodes, revcodes, ninserts)
+    counter = PyReadCounter(dict_merge([readInserts(ins) for ins in args.insert_sequence]), fwcodes, revcodes, ninserts)
     counter.countReads(os.path.join(args.outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped_"), args.threads)
 
     df = counter.asDataFrames()
