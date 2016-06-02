@@ -26,6 +26,8 @@ cdef extern from "cReadCounter.h" nogil:
         uint64_t unmatchedInsert()
         uint64_t unmatchedBarcodeFw()
         uint64_t unmatchedBarcodeRev()
+        uint64_t unmatchedTotal()
+        uint64_t written()
 
 cdef dictToBarcodeSet(dict bset, BarcodeSet *out):
     cdef string istring
@@ -142,4 +144,12 @@ cdef class PyReadCounter:
     @property
     def unmatched_barcode_rev(self):
         return self._rdcntr.unmatchedBarcodeRev()
+
+    @property
+    def unmatched_total(self):
+        return self._rdcntr.unmatchedTotal()
+
+    @property
+    def written(self):
+        return self._rdcntr.written()
 

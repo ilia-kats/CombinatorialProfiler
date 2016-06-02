@@ -192,12 +192,12 @@ if __name__ == '__main__':
         ninserts = mergeInserts(dict_merge([readNamedInserts(i) for i in args.named_inserts]), fwcodes, revcodes)
     else:
         ninserts = None
-
+    import pdb;pdb.set_trace()
     unmatcheddir = os.path.join(args.outdir, "%s_unmapped" % mergedfqname)
     if not os.path.isdir(unmatcheddir):
         os.makedirs(unmatcheddir)
     counter = PyReadCounter(dict_merge([readInserts(ins) for ins in args.insert_sequence]), fwcodes, revcodes, ninserts)
-    counter.countReads(os.path.join(args.outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped_"), args.threads)
+    counter.countReads(os.path.join(args.outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped"), args.threads)
 
     df = counter.asDataFrames()
     for i, v in df.items():

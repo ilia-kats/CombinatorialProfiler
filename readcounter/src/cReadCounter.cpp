@@ -11,6 +11,8 @@
 #include <atomic>
 #include <thread>
 
+#include <cassert>
+
 Read::Read()
 {}
 
@@ -153,7 +155,7 @@ std::pair<std::string::size_type, std::string::size_type> SequenceMatcher::match
 }
 
 ReadCounter::ReadCounter(const std::unordered_map<std::string, std::string> &insertseqs, BarcodeSet *fw, BarcodeSet *rev, InsertSet *ins)
-: m_read(0), m_counted(0), m_unmatched_insert(0), m_unmatched_fw(0), m_unmatched_rev(0), m_barcodes_fw(fw), m_barcodes_rev(rev), m_inserts(ins)
+: m_read(0), m_counted(0), m_unmatched_insert(0), m_unmatched_fw(0), m_unmatched_rev(0), m_unmatched_total(0), m_written(0), m_barcodes_fw(fw), m_barcodes_rev(rev), m_inserts(ins)
 {
     for (const auto &ins : insertseqs) {
         m_matcher.emplace(ins);
@@ -164,14 +166,14 @@ struct ReadCounter::ThreadSynchronization
 {
     struct FailedMatch
     {
-        enum class Fail {noFail, insertFailed, fwBarcodeFailed, revBarcodeFailed, insertMatchFailed};
+        enum Fail {noFail = 0x0, insertFailed = 0x1, fwBarcodeFailed = 0x2, revBarcodeFailed = 0x4, insertMatchFailed = 0x8};
         Read read;
-        Fail fail;
+        int fail;
         std::string insert_name;
         std::string barcode_fw;
         std::string barcode_rev;
 
-        FailedMatch(Read r, Fail f, std::string fw, std::string rev)
+        FailedMatch(Read r, int f, std::string fw, std::string rev)
         : read(std::move(r)), fail(f), barcode_fw(std::move(fw)), barcode_rev(std::move(rev))
         {}
     };
@@ -208,6 +210,8 @@ void ReadCounter::countReads(const std::string &file, const std::string &outpref
     sync.finishedMatching = true;
     sync.outqueueempty.notify_one();
     writer.join();
+    assert(m_read == m_counted + m_unmatched_total);
+    assert(m_unmatched_total == m_written);
 }
 
 uint64_t ReadCounter::read() const
@@ -233,6 +237,16 @@ uint64_t ReadCounter::unmatchedBarcodeFw() const
 uint64_t ReadCounter::unmatchedBarcodeRev() const
 {
     return m_unmatched_rev;
+}
+
+uint64_t ReadCounter::unmatchedTotal() const
+{
+    return m_unmatched_total;
+}
+
+uint64_t ReadCounter::written() const
+{
+    return m_written;
 }
 
 void ReadCounter::readFile(const std::string &file, ThreadSynchronization *sync)
@@ -274,25 +288,30 @@ void ReadCounter::writeReads(const std::string &prefix, ThreadSynchronization *s
         sync->outqueue.pop();
         qlock.unlock();
         sync->outqueuefull.notify_one();
-        std::string fname = prefix;
-        switch (fmatch.fail) {
-            case ThreadSynchronization::FailedMatch::Fail::insertFailed:
-                fname.append("noinsert");
-                break;
-            case ThreadSynchronization::FailedMatch::Fail::fwBarcodeFailed:
-            case ThreadSynchronization::FailedMatch::Fail::revBarcodeFailed:
-            case ThreadSynchronization::FailedMatch::Fail::insertMatchFailed:
-                fname.append(fmatch.barcode_fw).append("_").append(fmatch.barcode_rev);
-                break;
-            default:
-                break;
+        std::vector<std::string> fname;
+        fname.push_back(prefix);
+        if (fmatch.fail == ThreadSynchronization::FailedMatch::Fail::insertFailed)
+            fname.push_back("noinsert");
+        if (fmatch.fail == ThreadSynchronization::FailedMatch::Fail::insertMatchFailed || fmatch.fail & ThreadSynchronization::FailedMatch::Fail::revBarcodeFailed && !(fmatch.fail & ThreadSynchronization::FailedMatch::Fail::fwBarcodeFailed)) {
+            fname.push_back("fw");
+            fname.push_back(fmatch.barcode_fw);
+        }
+        if (fmatch.fail == ThreadSynchronization::FailedMatch::Fail::insertMatchFailed || fmatch.fail & ThreadSynchronization::FailedMatch::Fail::fwBarcodeFailed && !(fmatch.fail & ThreadSynchronization::FailedMatch::Fail::revBarcodeFailed)) {
+            fname.push_back("rev");
+            fname.push_back(fmatch.barcode_rev);
         }
         if (fmatch.fail == ThreadSynchronization::FailedMatch::Fail::insertMatchFailed)
-            fname.append("_unmatched");
-        fname.append(".fastq");
-        if (!files[fname].is_open())
-            files[fname].open(fname);
-        files[fname] << fmatch.read.getName() << std::endl << fmatch.read.getSequence() << std::endl << fmatch.read.getDescription() << std::endl << fmatch.read.getQuality() << std::endl;
+            fname.push_back("unmatched");
+        auto it = fname.cbegin();
+        std::string outfname = *it++;
+        for (; it != fname.cend(); ++it)
+            outfname.append("_").append(*it);
+
+        outfname.append(".fastq");
+        if (!files[outfname].is_open())
+            files[outfname].open(outfname);
+        files[outfname] << fmatch.read.getName() << std::endl << fmatch.read.getSequence() << std::endl << fmatch.read.getDescription() << std::endl << fmatch.read.getQuality() << std::endl;
+        ++m_written;
     }
 }
 
@@ -315,6 +334,7 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
     uint64_t unmatched_insert = 0;
     uint64_t unmatched_fw = 0;
     uint64_t unmatched_rev = 0;
+    uint64_t unmatched_total = 0;
 
     while (true) {
         qlock.lock();
@@ -329,7 +349,7 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
         qlock.unlock();
         sync->inqueuefull.notify_one();
 
-        ThreadSynchronization::FailedMatch::Fail fail = ThreadSynchronization::FailedMatch::Fail::noFail;
+        int fail = ThreadSynchronization::FailedMatch::Fail::noFail;
         std::string fwkey;
         std::string revkey;
         std::string insert;
@@ -380,13 +400,15 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
                     } else {
                         fail = ThreadSynchronization::FailedMatch::Fail::insertMatchFailed;
                     }
-                }
-                else if (!fwfound) {
-                    ++unmatched_fw;
-                    fail = ThreadSynchronization::FailedMatch::Fail::fwBarcodeFailed;
                 } else {
-                    ++unmatched_rev;
-                    fail = ThreadSynchronization::FailedMatch::Fail::revBarcodeFailed;
+                    if (!fwfound) {
+                        ++unmatched_fw;
+                        fail |= ThreadSynchronization::FailedMatch::Fail::fwBarcodeFailed;
+                    }
+                    if (!revfound) {
+                        ++unmatched_rev;
+                        fail |= ThreadSynchronization::FailedMatch::Fail::revBarcodeFailed;
+                    }
                 }
                 break;
             } catch (std::exception &e) {
@@ -397,6 +419,7 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
         if (fail == ThreadSynchronization::FailedMatch::Fail::insertFailed)
             ++unmatched_insert;
         if (fail != ThreadSynchronization::FailedMatch::Fail::noFail) {
+            ++unmatched_total;
             oqlock.lock();
             if (sync->outqueue.size() >= sync->maxsize)
                 sync->outqueuefull.wait(oqlock, [&sync]{return sync->outqueue.size() < sync->maxsize;});
@@ -418,6 +441,7 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
     m_unmatched_insert += unmatched_insert;
     m_unmatched_fw += unmatched_fw;
     m_unmatched_rev += unmatched_rev;
+    m_unmatched_total += unmatched_total;
     clock.unlock();
 }
 

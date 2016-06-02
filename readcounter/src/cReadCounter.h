@@ -77,6 +77,8 @@ public:
     uint64_t unmatchedInsert() const;
     uint64_t unmatchedBarcodeFw() const;
     uint64_t unmatchedBarcodeRev() const;
+    uint64_t unmatchedTotal() const;
+    uint64_t written() const;
 
 private:
     struct ThreadSynchronization;
@@ -86,7 +88,9 @@ private:
     uint64_t m_counted;
     uint64_t m_unmatched_insert;
     uint64_t m_unmatched_fw;
-    uint16_t m_unmatched_rev;
+    uint64_t m_unmatched_rev;
+    uint64_t m_unmatched_total;
+    uint64_t m_written;
 
     BarcodeSet *m_barcodes_fw;
     BarcodeSet *m_barcodes_rev;
