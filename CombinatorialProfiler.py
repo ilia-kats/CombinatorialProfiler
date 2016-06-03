@@ -192,7 +192,6 @@ if __name__ == '__main__':
         ninserts = mergeInserts(dict_merge([readNamedInserts(i) for i in args.named_inserts]), fwcodes, revcodes)
     else:
         ninserts = None
-    import pdb;pdb.set_trace()
     unmatcheddir = os.path.join(args.outdir, "%s_unmapped" % mergedfqname)
     if not os.path.isdir(unmatcheddir):
         os.makedirs(unmatcheddir)
