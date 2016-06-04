@@ -110,8 +110,14 @@ cdef class PyReadCounter:
                     counts.append(cnts)
             df = pd.DataFrame()
             df['insert'] = pd.Series(insert, dtype='category')
-            df['barcode_fw'] = pd.Series(barcode_fw, dtype='category')
-            df['barcode_rev'] = pd.Series(barcode_rev, dtype='category')
+            if self.fw is not None and ins in self.fw:
+                df['barcode_fw'] = pd.Categorical(barcode_fw, categories=self.fw[ins].keys())
+            else:
+                df['barcode_fw'] = ''
+            if self.rev is not None and ins in self.rev:
+                df['barcode_rev'] = pd.Categorical(barcode_rev, categories=self.rev[ins].keys())
+            else:
+                df['barcode_rev'] = ''
             df['sequence'] = sequence
 
             if self.namedInserts and ins in self.namedInserts:

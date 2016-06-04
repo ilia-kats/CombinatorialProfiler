@@ -6,6 +6,7 @@ import subprocess
 import csv
 
 import pandas as pd
+import numpy as np
 
 import Bio.Seq
 import Bio.Alphabet
@@ -16,7 +17,7 @@ def dict_merge(dicts):
     dct = dicts.pop()
     while len(dicts):
         merge_dct = dicts.pop()
-        for k, v in merge_dct.iteritems():
+        for k, v in merge_dct.items():
             if (k in dct and isinstance(dct[k], dict)
                     and isinstance(merge_dct[k], dict)):
                 dict_merge(dct[k], merge_dct[k])
@@ -33,7 +34,7 @@ def get_csv_reader(csvfile):
     reader = csv.reader(csvfile, dialect)
     if has_header:
         next(reader)
-    return reader
+    return (reader, has_header)
 
 def split_spec(spec):
     sep = spec.find(':')
@@ -42,17 +43,20 @@ def split_spec(spec):
     else:
         return (spec[:sep], spec[sep + 1:])
 
-def get_named_reader(spec):
+def get_named_file(spec):
     if os.path.isfile(spec):
-        f = open(spec, newline='')
-        return (None, get_csv_reader(f), f)
+        return (None, spec)
     else:
         name, fpath = split_spec(spec)
         if not os.path.isfile(fpath):
             raise RuntimeError("Invalid file specification")
         else:
-            f = open(fpath, newline='')
-            return (name, get_csv_reader(f), f)
+            return (name, fpath)
+
+def get_named_reader(spec):
+    name, fpath = get_named_file(spec)
+    f = open(fpath, newline='')
+    return (name, get_csv_reader(f)[0], f)
 
 def generateBarcodes(codes):
     ccodes = {}
@@ -90,9 +94,86 @@ def readBarcodes(fpath, reverse=False):
     if reverse:
         for i, b in codes.items():
             for k,v in b.items():
-                b[k] = tuple(bcode.translate(ttable)[::-1] for bcode in v)
+                b[k] = v.translate(ttable)[::-1]
 
     return codes
+
+def readCellCounts(spec, barcodes_fw, barcodes_rev):
+    name, fpath = get_named_file(spec)
+    f = open(fpath, newline='')
+    header = get_csv_reader(f)[1]
+    f.close()
+
+    if header:
+        header = 0
+    else:
+        header = None
+    if barcodes_fw is None and barcodes_rev is None or barcodes_fw is not None and name and name not in barcodes_fw and barcodes_rev is not None and name and name not in barcodes_rev:
+        return {}
+    df = pd.read_csv(fpath, header=header, sep=None)
+    types = df.get_dtype_counts()
+    if not name or types['float64'] != df.columns.size - 1:
+        def getCountsDict(cname, group, barcodes_fw, barcodes_rev, indexcols, valuecol):
+            if barcodes_fw is not None and cname in barcodes_fw and set(group.iloc[:,indexcols[0]].squeeze()) == barcodes_fw[cname].keys():
+                if barcodes_rev is not None and cname in barcodes_rev and set(group.iloc[:,indexcols[1]].squeeze()) != barcodes_rev[cname].keys():
+                    raise RuntimeError("Barcode labels don't match sorted cells labels")
+                else:
+                    cgroup = group.set_index(group.columns[indexcols].values.tolist())
+                    return cgroup.to_dict()[group.columns[valuecol]]
+            elif barcodes_rev is not None and cname in barcodes_rev and set(group.iloc[:,indexcols[0]].squeeze()) == barcodes_rev[cname].keys():
+                cgroup = group.set_index(group.columns[list(reversed(indexcols))].values.tolist())
+                return cgroup.to_dict()[group.columns[valuecol]]
+            else:
+                raise RuntimeError("Barcode labels don't match sorted cells labels")
+
+        df = df.reset_index()
+        valuecol = np.where(df.dtypes == 'float64')[0]
+        if valuecol.size > 1:
+            raise RuntimeError("Unrecognized sorted cells format: Multiple numeric columns")
+        if valuecol[0] == 0:
+            raise RuntimeError("Unrecognized sorted cells format: No barcode labels given")
+        if barcodes_fw is not None and barcodes_rev is not None:
+            indexcols = [valuecol[0] - 2, valuecol[0] - 1]
+        else:
+            df[df.columns.size] = ''
+            indexcols = [valuecol - 1, df.columns.size - 1]
+        if df.columns.size > valuecol[0] and not name:
+            df = df.set_index(df.columns[valuecol[0] + 1])
+            retdict = {}
+            for cname, group in df.groupby(level=0):
+                retdict[cname] = getCountsDict(cname, group, barcodes_fw, barcodes_rev, indexcols, valuecol[0])
+            return retdict
+        else:
+            if not name:
+                name = ''
+            return {name: getCountsDict(name, df, barcodes_fw, barcodes_rev, indexcols, valuecol[0])}
+            raise RuntimeError("No insert name given")
+    else:
+        df = df.set_index(df.columns[0])
+        if barcodes_fw is not None and name in barcodes_fw and barcodes_rev is not None and name in barcodes_rev:
+            if set(df.index) == barcodes_fw[name].keys() and set(df.columns) == barcodes_rev[name].keys():
+                return {name: df.stack().to_dict()}
+            elif set(df.index) == barcodes_rev[name].keys() and set(df.columns) == barcodes_fw[name].keys():
+                return {name: df.T.stack().to_dict()}
+            else:
+                raise RuntimeError("Barcode labels don't match sorted cells labels")
+        else:
+            if min(df.shape) != 1:
+                raise RuntimeError("Too many sorted cells labels for the barcodes given")
+            if df.shape[1] > df.shape[0]:
+                df = df.T
+
+            if barcodes_fw is not None and name in barcodes_fw:
+                tomatch = barcodes_fw
+                tdict = lambda x: x.rename(columns={x.columns[0]: ''}).stack().to_dict()
+            elif barcodes_rev is not None and name in barcodes_rev:
+                tomatch = barcodes_rev
+                tdict = lambda x: x.T.rename(columns={x.columns[0]: ''}).stack().to_dict()
+
+            if set(df.index) != tomatch[name].keys():
+                raise RuntimeError("Barcode labels don't match sorted cells labels")
+            else:
+                return {name: tdict(df)}
 
 def readNamedInserts(ins):
     inserts = {}
@@ -106,7 +187,7 @@ def readInserts(ins):
     inserts = {}
     if os.path.isfile(ins):
         with open(ins) as insfile:
-            reader = get_csv_reader(insfile)
+            reader = get_csv_reader(insfile)[0]
             for r in reader:
                 inserts[r[0]] = r[1]
     else:
@@ -128,6 +209,13 @@ def mergeInserts(ins, barcodes_fw, barcodes_rev):
             ins[k] = insseq
     return ins
 
+def normalizeCounts(df):
+    groupby = []
+    if 'barcode_fw' in df.columns:
+        groupby.append('barcode_fw')
+    if 'barcode_rev' in df.columns:
+        groupby.append('barcode_rev')
+
 if __name__ == '__main__':
     import argparse
     import difflib
@@ -144,6 +232,7 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--reverse-barcodes', required=False, action='append', help='File containing reverse barcodes. Must be csv-like with column 1 containing the name and column 2 the barcode')
     parser.add_argument('-i', '--insert-sequence', required=False, action='append', help='Either an insert sequence to match against or path to a csv-like file with column 1 containing the name and column 2 the sequence. Variable region must be marked with a sequence of Ns')
     parser.add_argument('-n', '--named-inserts', required=False, action='append', help='Named sequences of allowed variable sequences within the insert. Csv-like file with the first column containing the name and the second column the sequence')
+    parser.add_argument('-s', '--sorted-cells', required=False, action='append', help='Path to a CSV file containing the relative amounts of sorted cells per barcode combination')
 
     args = parser.parse_args()
 
@@ -206,3 +295,6 @@ if __name__ == '__main__':
             prefix = "%s_" % i
         v['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in v.itertuples()])
         v.to_csv(os.path.join(args.outdir, "%sraw_counts.csv" % prefix), index=False, encoding='utf-8')
+    if args.sorted_cells:
+        sortedcells = dict_merge([readCellCounts(c, fwcodes, revcodes) for c in args.sorted_cells])
+
