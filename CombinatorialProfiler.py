@@ -7,6 +7,8 @@ import csv
 
 import pandas as pd
 import numpy as np
+from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
 
 import Bio.Seq
 import Bio.Alphabet
@@ -240,7 +242,7 @@ def getNDSI(df, nspec):
         groupby = 'barcode_fw'
         ndsicol = 'barcode_rev'
     fractionvals = pd.Series(range(1, df[insert][ndsicol].cat.categories.size + 1), index=sorted(df[insert][ndsicol].cat.categories))
-    return (insert, df[insert].groupby([groupby, 'translation']).apply(calcNDSI, ndsicol, fractionvals).dropna().reset_index())
+    return (insert, groupby, ndsicol, df[insert].groupby([groupby, 'translation']).apply(calcNDSI, ndsicol, fractionvals).dropna().reset_index())
 
 if __name__ == '__main__':
     import argparse
@@ -332,10 +334,26 @@ if __name__ == '__main__':
 
     if args.ndsi:
         for n in args.ndsi:
-            ins, ndsi = getNDSI(df, n)
+            ins, groupby, ndsicol, ndsi = getNDSI(df, n)
             if not len(ins):
                 prefix = ''
             else:
                 prefix = "%s_" % i
             ndsi.to_csv(os.path.join(args.outdir, "%sNDSIs.csv" % prefix), index=False, encoding='utf-8')
+            labels = sorted(df[ins][ndsicol].cat.categories)
+            integer_map = dict([(val, i) for i, val in enumerate(labels)])
+            if 'named_insert' in df[ins]:
+                seqcol = 'named_insert'
+            else:
+                seqcol = 'sequence'
+            with PdfPages(os.path.join(args.outdir, "%scountplots.pdf" % prefix)) as pdf:
+                for (code, seq), group in df[ins].groupby([groupby, seqcol]):
+                    fig = plt.figure(figsize=(5,3))
+                    plot = plt.plot(group[ndsicol].map(integer_map), group['normalized_counts'], 'ko-')
+                    plt.xlim(0, len(labels) - 1)
+                    plt.xticks(range(len(labels)), labels)
+                    plt.title("%s %s" % (code, seq))
+                    plt.ylabel("normalized counts")
+                    pdf.savefig(bbox_inches='tight')
+                    plt.close()
 
