@@ -211,12 +211,36 @@ def mergeInserts(ins, barcodes_fw, barcodes_rev):
             ins[k] = insseq
     return ins
 
-def normalizeCounts(df):
-    groupby = []
-    if 'barcode_fw' in df.columns:
-        groupby.append('barcode_fw')
-    if 'barcode_rev' in df.columns:
-        groupby.append('barcode_rev')
+def normalizeCounts(df, sortedcells):
+    df = df.set_index(['insert','barcode_fw', 'barcode_rev','sequence'])
+    df['normalized_counts'] = (df['counts'] / df.groupby(level=['barcode_fw', 'barcode_rev'])['counts'].transform(sum)).unstack(['insert','sequence']).mul(sortedcells, axis=0).stack(['insert','sequence']).reorder_levels(df.index.names).dropna()
+    df = df.reset_index()
+    df['insert'] = df['insert'].astype("category")
+    df.barcode_fw = df.barcode_fw.astype("category")
+    df.barcode_rev = df.barcode_rev.astype("category")
+    return df
+
+def getNDSI(df, nspec):
+    def calcNDSI(group, ndsicol, fractionvals):
+        calc = lambda x: sum((x * fractionvals).dropna()) / sum(x)
+        g = group.set_index(ndsicol)
+        pooled = calc(g.groupby(level=ndsicol)['normalized_counts'].sum().dropna())
+        med = g.groupby('sequence')['normalized_counts'].aggregate(calc).median()
+        return pd.Series({'median_ndsi': med, 'pooled_ndsi': pooled})
+
+    insert, direction = split_spec(nspec)
+    if insert not in df:
+        raise RuntimeError("No data for NDSI calculation: %s" % insert)
+    elif direction != "forward" and direction != "reverse":
+        raise RuntimeError("Unrecognized direction")
+    elif direction == "forward":
+        groupby = 'barcode_rev'
+        ndsicol = 'barcode_fw'
+    else:
+        groupby = 'barcode_fw'
+        ndsicol = 'barcode_rev'
+    fractionvals = pd.Series(range(1, df[insert][ndsicol].cat.categories.size + 1), index=sorted(df[insert][ndsicol].cat.categories))
+    return (insert, df[insert].groupby([groupby, 'translation']).apply(calcNDSI, ndsicol, fractionvals).dropna().reset_index())
 
 if __name__ == '__main__':
     import argparse
@@ -235,6 +259,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--insert-sequence', required=False, action='append', help='Either an insert sequence to match against or path to a csv-like file with column 1 containing the name and column 2 the sequence. Variable region must be marked with a sequence of Ns')
     parser.add_argument('-n', '--named-inserts', required=False, action='append', help='Named sequences of allowed variable sequences within the insert. Csv-like file with the first column containing the name and the second column the sequence')
     parser.add_argument('-s', '--sorted-cells', required=False, action='append', help='Path to a CSV file containing the relative amounts of sorted cells per barcode combination')
+    parser.add_argument('--ndsi', action='append', required=False, help='Whether to use forward or reverse barcodes as FACS fractions for NDSI calculation.')
 
     args = parser.parse_args()
 
@@ -295,11 +320,7 @@ if __name__ == '__main__':
         sortedcells = dict_merge([readCellCounts(c, fwcodes, revcodes) for c in args.sorted_cells])
         for i,v in df.items():
             if i in sortedcells:
-                v = v.set_index(['insert','barcode_fw', 'barcode_rev','sequence'])
-                import pdb;pdb.set_trace()
-                v['normalized_counts'] = (v['counts'] / v.groupby(level=['barcode_fw', 'barcode_rev'])['counts'].transform(sum)).unstack(['insert','sequence']).mul(sortedcells[i], axis=0).stack(['insert','sequence']).reorder_levels(v.index.names).dropna()
-                v = v.reset_index()
-                df[i] = v
+                df[i] = normalizeCounts(v, sortedcells[i])
 
     for i, v in df.items():
         if not len(i):
@@ -308,4 +329,13 @@ if __name__ == '__main__':
             prefix = "%s_" % i
         v['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in v.itertuples()])
         v.to_csv(os.path.join(args.outdir, "%sraw_counts.csv" % prefix), index=False, encoding='utf-8')
+
+    if args.ndsi:
+        for n in args.ndsi:
+            ins, ndsi = getNDSI(df, n)
+            if not len(ins):
+                prefix = ''
+            else:
+                prefix = "%s_" % i
+            ndsi.to_csv(os.path.join(args.outdir, "%sNDSIs.csv" % prefix), index=False, encoding='utf-8')
 
