@@ -118,15 +118,15 @@ def readCellCounts(spec, barcodes_fw, barcodes_rev):
                 if barcodes_rev is not None and cname in barcodes_rev and set(group.iloc[:,indexcols[1]].squeeze()) != barcodes_rev[cname].keys():
                     raise RuntimeError("Barcode labels don't match sorted cells labels")
                 else:
-                    cgroup = group.set_index(group.columns[indexcols].values.tolist())
-                    return cgroup.to_dict()[group.columns[valuecol]]
+                    index = group.columns[indexcols].values.tolist()
             elif barcodes_rev is not None and cname in barcodes_rev and set(group.iloc[:,indexcols[0]].squeeze()) == barcodes_rev[cname].keys():
-                cgroup = group.set_index(group.columns[list(reversed(indexcols))].values.tolist())
-                return cgroup.to_dict()[group.columns[valuecol]]
+                index = group.columns[list(reversed(indexcols))].values.tolist()
             else:
                 raise RuntimeError("Barcode labels don't match sorted cells labels")
+            cgroup = group.set_index(index)
+            cgroup.index.rename(['barcode_fw', 'barcode_rev'], inplace=True)
+            return cgroup.loc[:,group.columns[valuecol]]
 
-        df = df.reset_index()
         valuecol = np.where(df.dtypes == 'float64')[0]
         if valuecol.size > 1:
             raise RuntimeError("Unrecognized sorted cells format: Multiple numeric columns")
@@ -152,9 +152,9 @@ def readCellCounts(spec, barcodes_fw, barcodes_rev):
         df = df.set_index(df.columns[0])
         if barcodes_fw is not None and name in barcodes_fw and barcodes_rev is not None and name in barcodes_rev:
             if set(df.index) == barcodes_fw[name].keys() and set(df.columns) == barcodes_rev[name].keys():
-                return {name: df.stack().to_dict()}
+                toreturn = df.stack()
             elif set(df.index) == barcodes_rev[name].keys() and set(df.columns) == barcodes_fw[name].keys():
-                return {name: df.T.stack().to_dict()}
+                toreturn = df.T.stack()
             else:
                 raise RuntimeError("Barcode labels don't match sorted cells labels")
         else:
@@ -165,15 +165,17 @@ def readCellCounts(spec, barcodes_fw, barcodes_rev):
 
             if barcodes_fw is not None and name in barcodes_fw:
                 tomatch = barcodes_fw
-                tdict = lambda x: x.rename(columns={x.columns[0]: ''}).stack().to_dict()
+                tdict = lambda x: x.rename(columns={x.columns[0]: ''}).stack()
             elif barcodes_rev is not None and name in barcodes_rev:
                 tomatch = barcodes_rev
-                tdict = lambda x: x.T.rename(columns={x.columns[0]: ''}).stack().to_dict()
+                tdict = lambda x: x.T.rename(columns={x.columns[0]: ''}).stack()
 
             if set(df.index) != tomatch[name].keys():
                 raise RuntimeError("Barcode labels don't match sorted cells labels")
             else:
-                return {name: tdict(df)}
+                toreturn = tdict(df)
+        toreturn.index.rename(['barcode_fw', 'barcode_rev'], inplace=True)
+        return {name: toreturn}
 
 def readNamedInserts(ins):
     inserts = {}
@@ -288,6 +290,17 @@ if __name__ == '__main__':
     counter.countReads(os.path.join(args.outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped"), args.threads)
 
     df = counter.asDataFrames()
+
+    if args.sorted_cells:
+        sortedcells = dict_merge([readCellCounts(c, fwcodes, revcodes) for c in args.sorted_cells])
+        for i,v in df.items():
+            if i in sortedcells:
+                v = v.set_index(['insert','barcode_fw', 'barcode_rev','sequence'])
+                import pdb;pdb.set_trace()
+                v['normalized_counts'] = (v['counts'] / v.groupby(level=['barcode_fw', 'barcode_rev'])['counts'].transform(sum)).unstack(['insert','sequence']).mul(sortedcells[i], axis=0).stack(['insert','sequence']).reorder_levels(v.index.names).dropna()
+                v = v.reset_index()
+                df[i] = v
+
     for i, v in df.items():
         if not len(i):
             prefix = ''
@@ -295,6 +308,4 @@ if __name__ == '__main__':
             prefix = "%s_" % i
         v['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in v.itertuples()])
         v.to_csv(os.path.join(args.outdir, "%sraw_counts.csv" % prefix), index=False, encoding='utf-8')
-    if args.sorted_cells:
-        sortedcells = dict_merge([readCellCounts(c, fwcodes, revcodes) for c in args.sorted_cells])
 
