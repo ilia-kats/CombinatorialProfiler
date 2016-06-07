@@ -59,3 +59,9 @@ class TwoColumnWidget(QWidget):
 
     def count(self):
         return self.ui.seqTbl.rowCount()
+
+    def serialize(self):
+        d = {}
+        for i in range(self.ui.seqTbl.rowCount()):
+            d[self.ui.seqTbl.item(i, 1).text()] = self.ui.seqTbl.item(i,0).text()
+        return d
