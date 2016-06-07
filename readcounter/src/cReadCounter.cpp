@@ -13,6 +13,183 @@
 
 #include <cassert>
 
+static std::string dummykey = "";
+
+class Read
+{
+public:
+    Read();
+    Read(std::string name);
+    Read(std::string name, std::string sequence);
+    Read(std::string name, std::string sequence, std::string description);
+    Read(std::string name, std::string sequence, std::string description, std::string quality);
+
+    void setName(std::string);
+    const std::string& getName() const;
+
+    void setSequence(std::string);
+    const std::string& getSequence() const;
+
+    void setDescription(std::string);
+    const std::string& getDescription() const;
+
+    void setQuality(std::string);
+    const std::string& getQuality() const;
+
+    Read reverseComplement() const;
+
+private:
+    std::string m_name;
+    std::string m_sequence;
+    std::string m_description;
+    std::string m_quality;
+};
+
+Experiment::Experiment()
+: ndsi(NDSIS::noNDSI)
+{}
+
+Experiment::Experiment(std::string n)
+: name(std::move(n)), ndsi(NDSIS::noNDSI)
+{}
+
+class Node
+{
+public:
+    Node() {}
+    virtual bool match(Read&, std::string*) const = 0;
+
+    std::shared_ptr<Experiment> experiment;
+
+protected:
+    static std::pair<std::string::size_type, uint16_t> fuzzy_find(const std::string &needle, const std::string &haystack)
+    {
+        auto totest = haystack.size() - needle.size();
+        std::vector<uint16_t> mismatches(totest);
+        auto mit = mismatches.begin();
+        for (size_t i = 0; i < totest; ++i, ++mit) {
+            *mit = std::inner_product(needle.cbegin(),
+                                      needle.cend(),
+                                      haystack.cbegin() + i,
+                                      static_cast<decltype(mismatches)::value_type>(0),
+                                      std::plus<decltype(mismatches)::value_type>(),
+                                      [](const std::remove_reference<decltype(needle)>::type::value_type &n, const std::remove_reference<decltype(haystack)>::type::value_type &h) -> bool {return static_cast<bool>(n ^ h);});
+        }
+        auto bestmatch = std::min_element(mismatches.cbegin(), mismatches.cend());
+        return std::make_pair(std::distance(mismatches.cbegin(), bestmatch), *bestmatch);
+    }
+};
+
+
+class BarcodeNode : public Node
+{
+public:
+    BarcodeNode() : Node() {};
+    BarcodeNode(std::string fullseq, std::vector<std::string> uniqueSeqs)
+    : Node(), fullSequence(std::move(fullseq)), m_uniqueSequences(std::move(uniqueSeqs))
+    {}
+    std::string fullSequence;
+
+protected:
+    std::vector<std::string> m_uniqueSequences;
+};
+
+class RevBarcodeNode : public BarcodeNode
+{
+public:
+    RevBarcodeNode() : BarcodeNode() {}
+    RevBarcodeNode(std::string fullseq, std::vector<std::string> uniqueSeqs)
+    : BarcodeNode(std::move(fullseq), std::move(uniqueSeqs))
+    {
+        // make reverse complement of unique sequences
+    }
+
+    virtual bool match(Read &rd, std::string*)
+    {
+        auto rdseq = rd.getSequence();
+        for (const auto &seq : m_uniqueSequences) {
+            if (!rdseq.compare(rdseq.size() - seq.size(), seq.size(), seq)) {
+                return true;
+            }
+        }
+        return false;
+    }
+};
+
+class FwBarcodeNode : public BarcodeNode
+{
+public:
+    FwBarcodeNode() : BarcodeNode() {}
+    FwBarcodeNode(std::string fullseq, std::vector<std::string> uniqueSeqs)
+    : BarcodeNode(std::move(fullseq), std::move(uniqueSeqs))
+    {}
+
+    virtual bool match(Read &rd, std::string*)
+    {
+        for (const auto &seq : m_uniqueSequences) {
+            auto rdseq = rd.getSequence();
+            if (!rdseq.compare(0, seq.size(), seq)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    std::vector<RevBarcodeNode*> revNodes;
+};
+
+class InsertNode : public Node
+{
+public:
+    InsertNode(const std::string &sequence, uint16_t mismatches = 1)
+    : Node(), m_fullseq(sequence), m_mismatches(mismatches)
+    {
+        // Currently assuming there is only one insert sequence
+        auto insert_start = m_fullseq.find_first_of("Nn");
+        auto insert_end = m_fullseq.find_last_of("Nn");
+        if (insert_start == std::string::npos || insert_end == std::string::npos)
+            throw std::invalid_argument("No dynamic insert sequence found");
+        m_insertlength = insert_end - insert_start + 1;
+        m_upstreamseq = m_fullseq.substr(0, insert_start);
+        m_downstreamseq = m_fullseq.substr(insert_end + 1, std::string::npos);
+    }
+
+    bool match(Read &read, std::string *insert) const
+    {
+        auto upstream = fuzzy_find(m_upstreamseq, read.getSequence());
+        if (upstream.second > m_mismatches) {
+            read = read.reverseComplement();
+            upstream = fuzzy_find(m_upstreamseq, read.getSequence());
+            if (upstream.second > m_mismatches)
+                return false;
+        }
+        auto downstream = fuzzy_find(m_downstreamseq, read.getSequence());
+        if (downstream.second > m_mismatches)
+            return false;
+        if (downstream.first - (upstream.first + m_upstreamseq.size()) != m_insertlength)
+            return false;
+        auto start = upstream.first + m_upstreamseq.size();
+
+        if (insert) {
+            insert->clear();
+            auto it = read.getSequence().cbegin();
+            std::copy(it + start, it + downstream.first, std::inserter(*insert, insert->begin()));
+        }
+        return true;
+    }
+
+    std::vector<FwBarcodeNode*> fwNodes;
+    std::vector<RevBarcodeNode*> revNodes;
+
+private:
+    const std::string m_fullseq;
+    uint16_t m_mismatches;
+
+    std::string m_upstreamseq;
+    std::string m_downstreamseq;
+    uint16_t m_insertlength;
+};
+
 Read::Read()
 {}
 
@@ -104,62 +281,9 @@ Read Read::reverseComplement() const
     return Read(m_name, seq2, m_description, qual);
 }
 
-const std::string ReadCounter::dummykey = std::string("");
-
-SequenceMatcher::SequenceMatcher(const std::string &sequence)
-: m_fullseq(sequence)
+ReadCounter::ReadCounter(std::vector<std::shared_ptr<Experiment>> experiments)
+: m_read(0), m_counted(0), m_written(0), m_experiments(experiments)
 {
-    // Currently assuming there is only one insert sequence
-    auto insert_start = m_fullseq.find_first_of("Nn");
-    auto insert_end = m_fullseq.find_last_of("Nn");
-    if (insert_start == std::string::npos || insert_end == std::string::npos)
-        throw std::invalid_argument("No dynamic insert sequence found");
-    m_insertlength = insert_end - insert_start + 1;
-    m_upstreamseq = m_fullseq.substr(0, insert_start);
-    m_downstreamseq = m_fullseq.substr(insert_end + 1, std::string::npos);
-}
-
-std::pair<std::string::size_type, uint16_t> SequenceMatcher::fuzzy_find(const std::string &needle, const std::string &haystack)
-{
-    auto totest = haystack.size() - needle.size();
-    std::vector<uint16_t> mismatches(totest);
-    auto mit = mismatches.begin();
-    for (size_t i = 0; i < totest; ++i, ++mit) {
-        *mit = std::inner_product(needle.cbegin(),
-                                  needle.cend(),
-                                  haystack.cbegin() + i,
-                                  static_cast<decltype(mismatches)::value_type>(0),
-                                  std::plus<decltype(mismatches)::value_type>(),
-                                  [](const std::remove_reference<decltype(needle)>::type::value_type &n, const std::remove_reference<decltype(haystack)>::type::value_type &h) -> bool {return static_cast<bool>(n ^ h);});
-    }
-    auto bestmatch = std::min_element(mismatches.cbegin(), mismatches.cend());
-    return std::make_pair(std::distance(mismatches.cbegin(), bestmatch), *bestmatch);
-}
-
-std::pair<std::string::size_type, std::string::size_type> SequenceMatcher::match(Read &read, uint16_t mismatches) const
-{
-    auto upstream = fuzzy_find(m_upstreamseq, read.getSequence());
-    if (upstream.second > mismatches) {
-        read = read.reverseComplement();
-        upstream = fuzzy_find(m_upstreamseq, read.getSequence());
-        if (upstream.second > mismatches)
-            throw std::runtime_error("Upstream sequence not found in read");
-    }
-    auto downstream = fuzzy_find(m_downstreamseq, read.getSequence());
-    if (downstream.second > mismatches)
-        throw std::runtime_error("Downstream sequence not found in read");
-    if (downstream.first - (upstream.first + m_upstreamseq.size()) != m_insertlength)
-        throw std::runtime_error("Insert length doesn't match");
-    auto start = upstream.first + m_upstreamseq.size();
-    return std::make_pair(start, downstream.first - start);
-}
-
-ReadCounter::ReadCounter(const std::unordered_map<std::string, std::string> &insertseqs, BarcodeSet *fw, BarcodeSet *rev, InsertSet *ins)
-: m_read(0), m_counted(0), m_unmatched_insert(0), m_unmatched_fw(0), m_unmatched_rev(0), m_unmatched_total(0), m_written(0), m_barcodes_fw(fw), m_barcodes_rev(rev), m_inserts(ins)
-{
-    for (const auto &ins : insertseqs) {
-        m_matcher.emplace(ins);
-    }
 }
 
 struct ReadCounter::ThreadSynchronization
@@ -222,26 +346,6 @@ uint64_t ReadCounter::read() const
 uint64_t ReadCounter::counted() const
 {
     return m_counted;
-}
-
-uint64_t ReadCounter::unmatchedInsert() const
-{
-    return m_unmatched_insert;
-}
-
-uint64_t ReadCounter::unmatchedBarcodeFw() const
-{
-    return m_unmatched_fw;
-}
-
-uint64_t ReadCounter::unmatchedBarcodeRev() const
-{
-    return m_unmatched_rev;
-}
-
-uint64_t ReadCounter::unmatchedTotal() const
-{
-    return m_unmatched_total;
 }
 
 uint64_t ReadCounter::written() const
@@ -331,118 +435,109 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
     std::unique_lock<std::mutex> oqlock(sync->outqueuemutex, std::defer_lock);
     decltype(m_counts) localcounts;
 
-    uint64_t unmatched_insert = 0;
-    uint64_t unmatched_fw = 0;
-    uint64_t unmatched_rev = 0;
-    uint64_t unmatched_total = 0;
-
-    while (true) {
-        qlock.lock();
-        if (!sync->inqueue.size() && !sync->eof)
-            sync->inqueueempty.wait(qlock, [&sync]{return sync->inqueue.size() || sync->eof;});
-        if (sync->eof && !sync->inqueue.size()) {
-            qlock.unlock();
-            break;
-        }
-        Read rd(sync->inqueue.front());
-        sync->inqueue.pop();
-        qlock.unlock();
-        sync->inqueuefull.notify_one();
-
-        int fail = ThreadSynchronization::FailedMatch::Fail::noFail;
-        std::string fwkey;
-        std::string revkey;
-        std::string insert;
-        for (const auto &i : m_matcher) {
-            try {
-                auto insertmatch = i.second.match(rd, 1);
-                bool fwfound = true;
-                bool revfound = true;
-                if (!m_barcodes_fw || !m_barcodes_fw->count(i.first))
-                    fwkey = dummykey;
-                else {
-                    fwfound = false;
-                    for (const auto &code : m_barcodes_fw->at(i.first)) {
-                        for (const auto &seq : code.second) {
-                            if (!rd.getSequence().compare(0, seq.size(), seq)) {
-                                fwfound = true;
-                                fwkey = code.first;
-                                break;
-                            }
-                        }
-                        if (fwfound)
-                            break;
-                    }
-                }
-                if (!m_barcodes_rev || !m_barcodes_rev->count(i.first))
-                    revkey = dummykey;
-                else {
-                    revfound = false;
-                    for (const auto &code : m_barcodes_rev->at(i.first)) {
-                        for (const auto &seq : code.second) {
-                            auto rdseq = rd.getSequence();
-                            if (!rdseq.compare(rdseq.size() - seq.size(), seq.size(), seq)) {
-                                revfound = true;
-                                revkey = code.first;
-                                break;
-                            }
-                        }
-                        if (revfound)
-                            break;
-                    }
-                }
-
-                if (fwfound && revfound) {
-                    auto seq = rd.getSequence().substr(insertmatch.first, insertmatch.second);
-                    if (!m_inserts || !m_inserts->count(i.first) || m_inserts->at(i.first).count(seq)) {
-                        ++localcounts[i.first][std::make_pair(fwkey, revkey)][seq];
-                        fail = ThreadSynchronization::FailedMatch::Fail::noFail;
-                    } else {
-                        fail = ThreadSynchronization::FailedMatch::Fail::insertMatchFailed;
-                    }
-                } else {
-                    if (!fwfound) {
-                        ++unmatched_fw;
-                        fail |= ThreadSynchronization::FailedMatch::Fail::fwBarcodeFailed;
-                    }
-                    if (!revfound) {
-                        ++unmatched_rev;
-                        fail |= ThreadSynchronization::FailedMatch::Fail::revBarcodeFailed;
-                    }
-                }
-                break;
-            } catch (std::exception &e) {
-                fail = ThreadSynchronization::FailedMatch::Fail::insertFailed;
-            }
-        }
-
-        if (fail == ThreadSynchronization::FailedMatch::Fail::insertFailed)
-            ++unmatched_insert;
-        if (fail != ThreadSynchronization::FailedMatch::Fail::noFail) {
-            ++unmatched_total;
-            oqlock.lock();
-            if (sync->outqueue.size() >= sync->maxsize)
-                sync->outqueuefull.wait(oqlock, [&sync]{return sync->outqueue.size() < sync->maxsize;});
-            sync->outqueue.emplace(std::move(rd), fail, std::move(fwkey), std::move(revkey));
-            oqlock.unlock();
-            sync->outqueueempty.notify_one();
-        }
-    }
-
-    std::unique_lock<std::mutex> clock(sync->countsmutex);
-    for (const auto &insname : localcounts) {
-        for (const auto &codes : insname.second) {
-            for (const auto &insert : codes.second) {
-                m_counts[insname.first][codes.first][insert.first] += insert.second;
-                m_counted += insert.second;
-            }
-        }
-    }
-    m_unmatched_insert += unmatched_insert;
-    m_unmatched_fw += unmatched_fw;
-    m_unmatched_rev += unmatched_rev;
-    m_unmatched_total += unmatched_total;
-    clock.unlock();
+//     while (true) {
+//         qlock.lock();
+//         if (!sync->inqueue.size() && !sync->eof)
+//             sync->inqueueempty.wait(qlock, [&sync]{return sync->inqueue.size() || sync->eof;});
+//         if (sync->eof && !sync->inqueue.size()) {
+//             qlock.unlock();
+//             break;
+//         }
+//         Read rd(sync->inqueue.front());
+//         sync->inqueue.pop();
+//         qlock.unlock();
+//         sync->inqueuefull.notify_one();
+//
+//         int fail = ThreadSynchronization::FailedMatch::Fail::noFail;
+//         std::string fwkey;
+//         std::string revkey;
+//         std::string insert;
+//         for (const auto &i : m_matcher) {
+//             try {
+//                 auto insertmatch = i.second.match(rd, 1);
+//                 bool fwfound = true;
+//                 bool revfound = true;
+//                 if (!m_barcodes_fw || !m_barcodes_fw->count(i.first))
+//                     fwkey = dummykey;
+//                 else {
+//                     fwfound = false;
+//                     for (const auto &code : m_barcodes_fw->at(i.first)) {
+//                         for (const auto &seq : code.second) {
+//                             if (!rd.getSequence().compare(0, seq.size(), seq)) {
+//                                 fwfound = true;
+//                                 fwkey = code.first;
+//                                 break;
+//                             }
+//                         }
+//                         if (fwfound)
+//                             break;
+//                     }
+//                 }
+//                 if (!m_barcodes_rev || !m_barcodes_rev->count(i.first))
+//                     revkey = dummykey;
+//                 else {
+//                     revfound = false;
+//                     for (const auto &code : m_barcodes_rev->at(i.first)) {
+//                         for (const auto &seq : code.second) {
+//                             auto rdseq = rd.getSequence();
+//                             if (!rdseq.compare(rdseq.size() - seq.size(), seq.size(), seq)) {
+//                                 revfound = true;
+//                                 revkey = code.first;
+//                                 break;
+//                             }
+//                         }
+//                         if (revfound)
+//                             break;
+//                     }
+//                 }
+//
+//                 if (fwfound && revfound) {
+//                     auto seq = rd.getSequence().substr(insertmatch.first, insertmatch.second);
+//                     if (!m_inserts || !m_inserts->count(i.first) || m_inserts->at(i.first).count(seq)) {
+//                         ++localcounts[i.first][std::make_pair(fwkey, revkey)][seq];
+//                         fail = ThreadSynchronization::FailedMatch::Fail::noFail;
+//                     } else {
+//                         fail = ThreadSynchronization::FailedMatch::Fail::insertMatchFailed;
+//                     }
+//                 } else {
+//                     if (!fwfound) {
+//                         ++unmatched_fw;
+//                         fail |= ThreadSynchronization::FailedMatch::Fail::fwBarcodeFailed;
+//                     }
+//                     if (!revfound) {
+//                         ++unmatched_rev;
+//                         fail |= ThreadSynchronization::FailedMatch::Fail::revBarcodeFailed;
+//                     }
+//                 }
+//                 break;
+//             } catch (std::exception &e) {
+//                 fail = ThreadSynchronization::FailedMatch::Fail::insertFailed;
+//             }
+//         }
+//
+//         if (fail == ThreadSynchronization::FailedMatch::Fail::insertFailed)
+//             ++unmatched_insert;
+//         if (fail != ThreadSynchronization::FailedMatch::Fail::noFail) {
+//             ++unmatched_total;
+//             oqlock.lock();
+//             if (sync->outqueue.size() >= sync->maxsize)
+//                 sync->outqueuefull.wait(oqlock, [&sync]{return sync->outqueue.size() < sync->maxsize;});
+//             sync->outqueue.emplace(std::move(rd), fail, std::move(fwkey), std::move(revkey));
+//             oqlock.unlock();
+//             sync->outqueueempty.notify_one();
+//         }
+//     }
+//
+//     std::unique_lock<std::mutex> clock(sync->countsmutex);
+//     for (const auto &insname : localcounts) {
+//         for (const auto &codes : insname.second) {
+//             for (const auto &insert : codes.second) {
+//                 m_counts[insname.first][codes.first][insert.first] += insert.second;
+//                 m_counted += insert.second;
+//             }
+//         }
+//     }
+//     clock.unlock();
 }
 
 const std::unordered_map<std::string, std::unordered_map<std::pair<std::string, std::string>, std::unordered_map<std::string, uint64_t>>>& ReadCounter::getCounts() const

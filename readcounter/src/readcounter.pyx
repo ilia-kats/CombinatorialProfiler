@@ -7,6 +7,7 @@ from libcpp.unordered_set cimport unordered_set
 from libcpp.string cimport string
 from libcpp.vector cimport vector
 from libcpp.utility cimport pair
+from libcpp.memory cimport shared_ptr
 from libc.stdint cimport *
 
 import csv
@@ -17,73 +18,112 @@ cdef extern from "cReadCounter.h" nogil:
     ctypedef unordered_map[string, unordered_set[string]] InsertSet
     ctypedef unordered_map[string, unordered_map[string, vector[string]]] BarcodeSet
 
+    ctypedef unordered_map[string, string] SequenceSet
+    ctypedef unordered_map[string, unordered_map[string, double]] SortedCellCounts
+    ctypedef unordered_map[pair[string, string], unordered_map[string, uint64_t]] Counts
+
+    cdef enum NDSIS:
+        noNDSI
+        forward
+        reverse
+
+    cdef cppclass Experiment:
+        Experiment() except+
+        Experiment(string) except+
+
+        string name
+        string insert
+        SequenceSet fwBarcodeSet
+        SequenceSet revBarcodeSet
+        NDSIS ndsi
+        SortedCellCounts sortedCells
+        Counts counts
+
     cdef cppclass ReadCounter:
-        ReadCounter(const unordered_map[string, string]&, BarcodeSet*, BarcodeSet*, InsertSet*) except+
+        ReadCounter(vector[shared_ptr[Experiment]]) except+
         void countReads(const string&, const string&, int)
         const unordered_map[string, unordered_map[pair[string, string], unordered_map[string, uint64_t]]]& getCounts()
         uint64_t read()
         uint64_t counted()
-        uint64_t unmatchedInsert()
-        uint64_t unmatchedBarcodeFw()
-        uint64_t unmatchedBarcodeRev()
-        uint64_t unmatchedTotal()
         uint64_t written()
 
-cdef dictToBarcodeSet(dict bset, BarcodeSet *out):
-    cdef string istring
-    cdef string kstring
-    for i, c in bset.items():
-        istring = i.encode()
-        for k, v in c.items():
-            kstring = k.encode()
-            for b in v:
-                deref(out)[istring][kstring].push_back(b.encode())
+cdef class PyExperiment:
+    cdef shared_ptr[Experiment] _exprmnt
 
-cdef dictToInsertSet(dict namedInserts, InsertSet *out):
-    for i, v in namedInserts.items():
-        for s, n in v.items():
-            deref(out)[i.encode()].insert(s.encode())
+    def __cinit__(self, str name, dict d=None):
+        self._exprmnt = shared_ptr[Experiment](new Experiment(name.encode()))
+
+    def __init__(self, str name, dict d=None):
+        if d:
+            self.fromDict(d)
+
+    def fromDict(self, d):
+        if 'insert' in d:
+            deref(self._exprmnt).insert = d['insert'].encode()
+        else:
+            raise RuntimeError("Insert sequence missing from experiment %s" % deref(self._exprmnt).name)
+        if 'barcodes_fw' in d:
+            for k, v in d['barcodes_fw'].items():
+                deref(self._exprmnt).fwBarcodeSet[v.encode()] = k.encode()
+        if 'barcodes_rev' in d:
+            for k,v in d['barcodes_rev'].items():
+                deref(self._exprmnt).revBarcodeSet[v.encode()] = k.encode()
+        if 'ndsi' in d:
+            haveNdsi = False
+            if d['ndsi'] == 'forward':
+                deref(self._exprmnt).ndsi = forward
+                haveNdsi = True
+            elif d['ndsi'] == 'reverse':
+                deref(self._exprmnt).ndsi = reverse
+                haveNdsi = True
+            else:
+                deref(self._exprmnt).ndsi = noNDSI
+            if haveNdsi and 'sortedcells' in d:
+                for fw, revs in d['sortedcells'].items():
+                    for r, v in revs.items():
+                        deref(self._exprmnt).sortedCells[fw.encode()][r.encode()] = v
+
+    @property
+    def name(self):
+        return deref(self._exprmnt).name
+
+    @property
+    def insert(self):
+        return deref(self._exprmnt).insert
+
+    @property
+    def forward_barcodes(self):
+        return deref(self._exprmnt).fwBarcodeSet
+
+    @property
+    def reverse_barcodes(self):
+        return deref(self._exprmnt).revBarcodeSet
+
+    @property
+    def ndsi(self):
+        return deref(self._exprmnt).ndsi
+
+    @property
+    def sorted_cells(self):
+        return deref(self._exprmnt).sortedCells
+
+    @property
+    def counts(self):
+        return deref(self._exprmnt).counts
+
 
 cdef class PyReadCounter:
     cdef ReadCounter *_rdcntr
-    cdef BarcodeSet _fw
-    cdef BarcodeSet _rev
-    cdef InsertSet _ins
+    cdef vector[shared_ptr[Experiment]] _experiments
 
     cdef readonly dict insertseq
     cdef readonly dict fw
     cdef readonly dict rev
     cdef readonly dict namedInserts
 
-    def __cinit__(self, dict insertseq, dict barcodes_fw, dict barcodes_rev, dict insertsToMap):
-        self.insertseq = insertseq
-        self.fw = barcodes_fw
-        self.rev = barcodes_rev
-        self.namedInserts = insertsToMap
-
-        cdef BarcodeSet *fw
-        cdef BarcodeSet *rev
-        cdef InsertSet *insset
-        if barcodes_fw is None:
-            fw = NULL
-        else:
-            fw = &self._fw
-            dictToBarcodeSet(barcodes_fw, fw)
-        if barcodes_rev is None:
-            rev = NULL
-        else:
-            rev = &self._rev
-            dictToBarcodeSet(barcodes_rev, rev)
-        if insertsToMap is None:
-            insset = NULL
-        else:
-            insset = &self._ins
-            dictToInsertSet(insertsToMap, insset)
-
-        cdef unordered_map[string, string] seqs
-        for k, v in insertseq.items():
-            seqs[k.encode()] = v.encode()
-        self._rdcntr = new ReadCounter(seqs, fw, rev, insset)
+    def __cinit__(self, list experiments):
+        pass
+        #self._rdcntr = new ReadCounter(seqs, fw, rev, insset)
 
     def __dealloc__(self):
         del self._rdcntr
@@ -91,41 +131,41 @@ cdef class PyReadCounter:
     def countReads(self, unicode fpath, unicode unmatchedpattern, threads=1):
         self._rdcntr.countReads(fpath.encode(), unmatchedpattern.encode(), threads)
 
-    def asDataFrames(self):
-        frames = {}
+    #def asDataFrames(self):
+        #frames = {}
 
-        countsdict = self.counts
-        for ins, bcodes in countsdict.items():
-            insert = []
-            barcode_fw = []
-            barcode_rev = []
-            sequence = []
-            counts = []
-            for codes, seqs in bcodes.items():
-                for seq, cnts in seqs.items():
-                    insert.append(ins)
-                    barcode_fw.append(codes[0])
-                    barcode_rev.append(codes[1])
-                    sequence.append(seq)
-                    counts.append(cnts)
-            df = pd.DataFrame()
-            df['insert'] = pd.Series(insert, dtype='category')
-            if self.fw is not None and ins in self.fw:
-                df['barcode_fw'] = pd.Categorical(barcode_fw, categories=self.fw[ins].keys())
-            else:
-                df['barcode_fw'] = ''
-            if self.rev is not None and ins in self.rev:
-                df['barcode_rev'] = pd.Categorical(barcode_rev, categories=self.rev[ins].keys())
-            else:
-                df['barcode_rev'] = ''
-            df['sequence'] = sequence
+        #countsdict = self.counts
+        #for ins, bcodes in countsdict.items():
+            #insert = []
+            #barcode_fw = []
+            #barcode_rev = []
+            #sequence = []
+            #counts = []
+            #for codes, seqs in bcodes.items():
+                #for seq, cnts in seqs.items():
+                    #insert.append(ins)
+                    #barcode_fw.append(codes[0])
+                    #barcode_rev.append(codes[1])
+                    #sequence.append(seq)
+                    #counts.append(cnts)
+            #df = pd.DataFrame()
+            #df['insert'] = pd.Series(insert, dtype='category')
+            #if self.fw is not None and ins in self.fw:
+                #df['barcode_fw'] = pd.Categorical(barcode_fw, categories=self.fw[ins].keys())
+            #else:
+                #df['barcode_fw'] = ''
+            #if self.rev is not None and ins in self.rev:
+                #df['barcode_rev'] = pd.Categorical(barcode_rev, categories=self.rev[ins].keys())
+            #else:
+                #df['barcode_rev'] = ''
+            #df['sequence'] = sequence
 
-            if self.namedInserts and ins in self.namedInserts:
-                df['named_insert'] = [self.namedInserts[ins][s] for s in sequence]
+            #if self.namedInserts and ins in self.namedInserts:
+                #df['named_insert'] = [self.namedInserts[ins][s] for s in sequence]
 
-            df['counts'] = counts
-            frames[ins] = df
-        return frames
+            #df['counts'] = counts
+            #frames[ins] = df
+        #return frames
 
     @property
     def counts(self):
@@ -138,22 +178,6 @@ cdef class PyReadCounter:
     @property
     def counted(self):
         return self._rdcntr.counted()
-
-    @property
-    def unmatched_insert(self):
-        return self._rdcntr.unmatchedInsert()
-
-    @property
-    def unmatched_barcode_fw(self):
-        return self._rdcntr.unmatchedBarcodeFw()
-
-    @property
-    def unmatched_barcode_rev(self):
-        return self._rdcntr.unmatchedBarcodeRev()
-
-    @property
-    def unmatched_total(self):
-        return self._rdcntr.unmatchedTotal()
 
     @property
     def written(self):

@@ -109,7 +109,7 @@ class ExperimentWidget(QWidget):
                     item = self.ui.sortedCellsTbl.item(r, c)
                     if not item:
                         item = self.ui.sortedCellsTbl.itemPrototype()
-                    fwdict[revcode] = item.data(Qt.EditRole)
+                    fwdict[revcode] = float(item.data(Qt.EditRole))
                 cells[fwcode] = fwdict
             d['sortedcells'] = cells
         return d
