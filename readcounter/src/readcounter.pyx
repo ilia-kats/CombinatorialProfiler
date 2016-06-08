@@ -40,18 +40,24 @@ cdef extern from "cReadCounter.h" nogil:
         Counts counts
 
     cdef cppclass ReadCounter:
-        ReadCounter(vector[shared_ptr[Experiment]]) except+
+        ReadCounter(vector[Experiment*]) except+
         void countReads(const string&, const string&, int)
-        const unordered_map[string, unordered_map[pair[string, string], unordered_map[string, uint64_t]]]& getCounts()
         uint64_t read()
+        uint64_t unmatchedTotal()
+        uint64_t unmatchedInsert()
+        uint64_t unmatchedBarcodes()
+        uint64_t unmatchedInsertSequence()
         uint64_t counted()
         uint64_t written()
 
 cdef class PyExperiment:
-    cdef shared_ptr[Experiment] _exprmnt
+    cdef Experiment *_exprmnt
 
     def __cinit__(self, str name, dict d=None):
-        self._exprmnt = shared_ptr[Experiment](new Experiment(name.encode()))
+        self._exprmnt = new Experiment(name.encode())
+
+    def __dealloc__(self):
+        del self._exprmnt
 
     def __init__(self, str name, dict d=None):
         if d:
@@ -114,16 +120,15 @@ cdef class PyExperiment:
 
 cdef class PyReadCounter:
     cdef ReadCounter *_rdcntr
-    cdef vector[shared_ptr[Experiment]] _experiments
-
-    cdef readonly dict insertseq
-    cdef readonly dict fw
-    cdef readonly dict rev
-    cdef readonly dict namedInserts
+    cdef list _exprmnts
 
     def __cinit__(self, list experiments):
-        pass
-        #self._rdcntr = new ReadCounter(seqs, fw, rev, insset)
+        cdef vector[Experiment*] vec
+        cdef PyExperiment exp;
+        self._exprmnts = experiments
+        for exp in self._exprmnts:
+            vec.push_back((<PyExperiment>exp)._exprmnt)
+        self._rdcntr = new ReadCounter(vec)
 
     def __dealloc__(self):
         del self._rdcntr
@@ -168,16 +173,28 @@ cdef class PyReadCounter:
         #return frames
 
     @property
-    def counts(self):
-        return self._rdcntr.getCounts()
-
-    @property
     def read(self):
         return self._rdcntr.read()
 
     @property
     def counted(self):
         return self._rdcntr.counted()
+
+    @property
+    def unmatched_total(self):
+        return self._rdcntr.unmatchedTotal()
+
+    @property
+    def unmatched_insert(self):
+        return self._rdcntr.unmatchedInsert()
+
+    @property
+    def unmatched_barcodes(self):
+        return self._rdcntr.unmatchedBarcodes()
+
+    @property
+    def unmatched_insert_sequence(self):
+        return self._rdcntr.unmatchedInsertSequence()
 
     @property
     def written(self):

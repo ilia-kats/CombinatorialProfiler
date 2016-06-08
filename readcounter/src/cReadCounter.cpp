@@ -13,30 +13,97 @@
 
 #include <cassert>
 
-static std::string dummykey = "";
+static std::string dummykey = std::string();
+
+std::string revCompl(const std::string &seq)
+{
+    std::string seq2;
+    seq2.reserve(seq.size());
+    std::transform(seq.crbegin(), seq.crend(), std::inserter(seq2, seq2.begin()), [](const std::remove_reference<decltype(seq)>::type::value_type &c) -> std::remove_reference<decltype(seq)>::type::value_type {
+        switch (c) {
+            case 'A':
+                return 'T';
+            case 'a':
+                return 't';
+            case 'T':
+                return 'A';
+            case 't':
+                return 'a';
+            case 'G':
+                return 'C';
+            case 'g':
+                return 'c';
+            case 'C':
+                return 'G';
+            case 'c':
+                return 'g';
+            default:
+                return 'N';
+        }
+    });
+    return seq2;
+}
 
 class Read
 {
 public:
-    Read();
-    Read(std::string name);
-    Read(std::string name, std::string sequence);
-    Read(std::string name, std::string sequence, std::string description);
-    Read(std::string name, std::string sequence, std::string description, std::string quality);
+    Read() {}
+    Read(std::string name)
+    : m_name(std::move(name))
+    {}
+    Read(std::string name, std::string sequence)
+    : m_name(std::move(name)), m_sequence(std::move(sequence))
+    {}
+    Read(std::string name, std::string sequence, std::string description)
+    : m_name(std::move(name)), m_sequence(std::move(sequence)), m_description(std::move(description))
+    {}
+    Read(std::string name, std::string sequence, std::string description, std::string quality)
+    : m_name(std::move(name)), m_sequence(std::move(sequence)), m_description(std::move(description)), m_quality(std::move(quality))
+    {}
 
-    void setName(std::string);
-    const std::string& getName() const;
+    void setName(std::string name)
+    {
+        m_name = std::move(name);
+    }
+    const std::string& getName() const
+    {
+        return m_name;
+    }
 
-    void setSequence(std::string);
-    const std::string& getSequence() const;
+    void setSequence(std::string sequence)
+    {
+        m_sequence = std::move(sequence);
+    }
+    const std::string& getSequence() const
+    {
+        return m_sequence;
+    }
 
-    void setDescription(std::string);
-    const std::string& getDescription() const;
+    void setDescription(std::string description)
+    {
+        m_description = std::move(description);
+    }
+    const std::string& getDescription() const
+    {
+        return m_description;
+    }
 
-    void setQuality(std::string);
-    const std::string& getQuality() const;
+    void setQuality(std::string quality)
+    {
+        m_quality = std::move(quality);
+    }
+    const std::string& getQuality() const
+    {
+        return m_quality;
+    }
 
-    Read reverseComplement() const;
+    Read reverseComplement() const
+    {
+        std::string qual;
+        qual.reserve(m_quality.size());
+        std::copy(m_quality.crbegin(), m_quality.crend(), std::inserter(qual, qual.begin()));
+        return Read(m_name, revCompl(m_sequence), m_description, qual);
+    }
 
 private:
     std::string m_name;
@@ -56,10 +123,18 @@ Experiment::Experiment(std::string n)
 class Node
 {
 public:
-    Node() {}
-    virtual bool match(Read&, std::string*) const = 0;
+    Node() : experiment(nullptr) {}
+    Node(std::string seq)
+    : experiment(nullptr), sequence(std::move(seq)) {}
 
-    std::shared_ptr<Experiment> experiment;
+    virtual ~Node() {}
+
+    virtual bool match(Read&, std::string *s=nullptr) const = 0;
+
+    Experiment *experiment;
+
+    std::vector<Node*> children;
+    std::string sequence;
 
 protected:
     static std::pair<std::string::size_type, uint16_t> fuzzy_find(const std::string &needle, const std::string &haystack)
@@ -84,13 +159,19 @@ protected:
 class BarcodeNode : public Node
 {
 public:
-    BarcodeNode() : Node() {};
-    BarcodeNode(std::string fullseq, std::vector<std::string> uniqueSeqs)
-    : Node(), fullSequence(std::move(fullseq)), m_uniqueSequences(std::move(uniqueSeqs))
-    {}
-    std::string fullSequence;
+    BarcodeNode() : Node(dummykey) {}
+    virtual ~BarcodeNode() {}
+
+    virtual bool match(Read &rd, std::string *s=nullptr) const
+    {
+        return true;
+    }
 
 protected:
+    BarcodeNode(std::string seq, std::vector<std::string> uniqueseq)
+    : Node(std::move(seq)), m_uniqueSequences(std::move(uniqueseq))
+    {}
+
     std::vector<std::string> m_uniqueSequences;
 };
 
@@ -101,10 +182,12 @@ public:
     RevBarcodeNode(std::string fullseq, std::vector<std::string> uniqueSeqs)
     : BarcodeNode(std::move(fullseq), std::move(uniqueSeqs))
     {
-        // make reverse complement of unique sequences
+        for (auto &s : m_uniqueSequences) {
+            s = revCompl(s);
+        }
     }
 
-    virtual bool match(Read &rd, std::string*)
+    virtual bool match(Read &rd, std::string *s=nullptr) const
     {
         auto rdseq = rd.getSequence();
         for (const auto &seq : m_uniqueSequences) {
@@ -124,7 +207,7 @@ public:
     : BarcodeNode(std::move(fullseq), std::move(uniqueSeqs))
     {}
 
-    virtual bool match(Read &rd, std::string*)
+    virtual bool match(Read &rd, std::string *s=nullptr) const
     {
         for (const auto &seq : m_uniqueSequences) {
             auto rdseq = rd.getSequence();
@@ -134,27 +217,25 @@ public:
         }
         return false;
     }
-
-    std::vector<RevBarcodeNode*> revNodes;
 };
 
 class InsertNode : public Node
 {
 public:
-    InsertNode(const std::string &sequence, uint16_t mismatches = 1)
-    : Node(), m_fullseq(sequence), m_mismatches(mismatches)
+    InsertNode(std::string seq, uint16_t mismatches = 1)
+    : Node(std::move(seq)), m_mismatches(mismatches)
     {
         // Currently assuming there is only one insert sequence
-        auto insert_start = m_fullseq.find_first_of("Nn");
-        auto insert_end = m_fullseq.find_last_of("Nn");
+        auto insert_start = sequence.find_first_of("Nn");
+        auto insert_end = sequence.find_last_of("Nn");
         if (insert_start == std::string::npos || insert_end == std::string::npos)
             throw std::invalid_argument("No dynamic insert sequence found");
         m_insertlength = insert_end - insert_start + 1;
-        m_upstreamseq = m_fullseq.substr(0, insert_start);
-        m_downstreamseq = m_fullseq.substr(insert_end + 1, std::string::npos);
+        m_upstreamseq = sequence.substr(0, insert_start);
+        m_downstreamseq = sequence.substr(insert_end + 1, std::string::npos);
     }
 
-    bool match(Read &read, std::string *insert) const
+    bool match(Read &read, std::string *insert=nullptr) const
     {
         auto upstream = fuzzy_find(m_upstreamseq, read.getSequence());
         if (upstream.second > m_mismatches) {
@@ -177,12 +258,7 @@ public:
         }
         return true;
     }
-
-    std::vector<FwBarcodeNode*> fwNodes;
-    std::vector<RevBarcodeNode*> revNodes;
-
 private:
-    const std::string m_fullseq;
     uint16_t m_mismatches;
 
     std::string m_upstreamseq;
@@ -190,115 +266,118 @@ private:
     uint16_t m_insertlength;
 };
 
-Read::Read()
-{}
-
-Read::Read(std::string name)
-: m_name(std::move(name))
-{}
-
-Read::Read(std::string name, std::string sequence)
-: m_name(std::move(name)), m_sequence(std::move(sequence))
-{}
-
-Read::Read(std::string name, std::string sequence, std::string description)
-: m_name(std::move(name)), m_sequence(std::move(sequence)), m_description(std::move(description))
-{}
-
-Read::Read(std::string name, std::string sequence, std::string description, std::string quality)
-: m_name(std::move(name)), m_sequence(std::move(sequence)), m_description(std::move(description)), m_quality(std::move(quality))
-{}
-
-void Read::setName(std::string name)
+std::unordered_map<std::string, std::vector<std::string>> makeUnique(const std::unordered_set<std::string> &codes)
 {
-    m_name = std::move(name);
-}
-
-const std::string& Read::getName() const
-{
-    return m_name;
-}
-
-void Read::setSequence(std::string sequence)
-{
-    m_sequence = std::move(sequence);
-}
-
-const std::string& Read::getSequence() const
-{
-    return m_sequence;
-}
-
-void Read::setDescription(std::string description)
-{
-    m_description = std::move(description);
-}
-
-const std::string& Read::getDescription() const
-{
-    return m_description;
-}
-
-void Read::setQuality(std::string quality)
-{
-    m_quality = std::move(quality);
-}
-
-const std::string& Read::getQuality() const
-{
-    return m_quality;
-}
-
-Read Read::reverseComplement() const
-{
-    std::string seq2;
-    std::string qual;
-    seq2.reserve(m_sequence.size());
-    qual.reserve(m_quality.size());
-    std::transform(m_sequence.crbegin(), m_sequence.crend(), std::inserter(seq2, seq2.begin()), [](const decltype(m_sequence)::value_type &c) -> decltype(m_sequence)::value_type {
-        switch (c) {
-            case 'A':
-                return 'T';
-            case 'a':
-                return 't';
-            case 'T':
-                return 'A';
-            case 't':
-                return 'a';
-            case 'G':
-                return 'C';
-            case 'g':
-                return 'c';
-            case 'C':
-                return 'G';
-            case 'c':
-                return 'g';
-            default:
-                return 'N';
+    std::unordered_map<std::string, std::vector<std::string>> uniqueCodes;
+    for (const auto &c : codes) {
+        std::vector<std::string> u;
+        for (std::remove_reference<decltype(c)>::type::size_type i = 0; i < c.size(); ++i) {
+            bool found = false;
+            for (const auto &cc : codes) {
+                if (cc != c && cc.find(c.c_str() + i) != std::remove_reference<decltype(cc)>::type::npos) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                u.push_back(c.substr(i));
         }
-    });
-    std::copy(m_quality.crbegin(), m_quality.crend(), std::inserter(qual, qual.begin()));
-    return Read(m_name, seq2, m_description, qual);
+        uniqueCodes[c] = std::move(u);
+    }
+    return uniqueCodes;
 }
 
-ReadCounter::ReadCounter(std::vector<std::shared_ptr<Experiment>> experiments)
-: m_read(0), m_counted(0), m_written(0), m_experiments(experiments)
+ReadCounter::ReadCounter(std::vector<Experiment*> experiments)
+: m_read(0), m_counted(0), m_unmatchedTotal(0), m_unmatchedInsert(0), m_unmatchedBarcodes(0), m_unmatchedInsertSequence(0), m_written(0), m_experiments(experiments)
 {
+    std::unordered_set<std::string> fwCodes;
+    std::unordered_set<std::string> revCodes;
+
+    std::unordered_map<std::string, InsertNode*> inserts;
+    for (const auto &exp : m_experiments) {
+        if (!inserts.count(exp->insert)) {
+            InsertNode *n = new InsertNode(exp->insert);
+            inserts[exp->insert] = n;
+            m_nodes.push_back(n);
+            m_tree.push_back(n);
+        }
+        for (const auto &c : exp->fwBarcodeSet)
+            fwCodes.insert(c.first);
+        for (const auto &c : exp->revBarcodeSet)
+            revCodes.insert(c.first);
+    }
+
+    std::unordered_map<std::string, std::vector<std::string>> uniqueFwCodes = makeUnique(fwCodes);
+    std::unordered_map<std::string, std::vector<std::string>> uniqueRevCodes = makeUnique(revCodes);
+
+    std::unordered_map<std::string, std::unordered_map<std::string, BarcodeNode*>> fwNodes;
+    std::unordered_map<std::string,BarcodeNode*> dummyNodes;
+
+    for (const auto &exp : m_experiments) {
+        std::vector<BarcodeNode*> revNodes;
+        for (const auto &c : exp->revBarcodeSet) {
+            BarcodeNode *n = new RevBarcodeNode(c.first, uniqueRevCodes[c.first]);
+            n->experiment = exp;
+            revNodes.push_back(n);
+            m_nodes.push_back(n);
+        }
+
+        for (const auto &c : exp->fwBarcodeSet) {
+            if (!fwNodes[exp->insert].count(c.first)) {
+                BarcodeNode *n = new FwBarcodeNode(c.first, uniqueFwCodes[c.first]);
+                fwNodes[exp->insert][c.first] = n;
+                m_nodes.push_back(n);
+                inserts[exp->insert]->children.push_back(n);
+            }
+            std::copy(revNodes.cbegin(), revNodes.cend(), std::inserter(fwNodes[exp->insert][c.first]->children, fwNodes[exp->insert][c.first]->children.end()));
+        }
+        if (!exp->fwBarcodeSet.size()) {
+            if (!dummyNodes.count(exp->insert)) {
+                BarcodeNode *n = new BarcodeNode();
+                m_nodes.push_back(n);
+                dummyNodes[exp->insert] = n;
+                std::copy(revNodes.cbegin(), revNodes.cend(), std::inserter(n->children, n->children.end()));
+            }
+        }
+    }
+
+    // have to make sure that dummy nodes are always last in the list
+    for (const auto &d : dummyNodes) {
+        inserts[d.first]->children.push_back(d.second);
+    }
+    for (const auto &exp : m_experiments) {
+        if (!exp->revBarcodeSet.size()) {
+            BarcodeNode *n = new BarcodeNode();
+            n->experiment = exp;
+            m_nodes.push_back(n);
+            if (exp->fwBarcodeSet.size()) {
+                for (const auto &c : exp->fwBarcodeSet) {
+                    fwNodes[exp->insert][c.first]->children.push_back(n);
+                }
+            } else {
+                dummyNodes[exp->insert]->children.push_back(n);
+            }
+        }
+    }
+}
+
+ReadCounter::~ReadCounter()
+{
+    for (auto &n : m_nodes)
+        delete n;
 }
 
 struct ReadCounter::ThreadSynchronization
 {
     struct FailedMatch
     {
-        enum Fail {noFail = 0x0, insertFailed = 0x1, fwBarcodeFailed = 0x2, revBarcodeFailed = 0x4, insertMatchFailed = 0x8};
+        enum class Fail {noFail, insertFailed, barcodeFailed, insertMatchFailed};
         Read read;
-        int fail;
-        std::string insert_name;
-        std::string barcode_fw;
-        std::string barcode_rev;
+        Fail fail;
+        std::vector<const Node*> nodes;
 
-        FailedMatch(Read r, int f, std::string fw, std::string rev)
-        : read(std::move(r)), fail(f), barcode_fw(std::move(fw)), barcode_rev(std::move(rev))
+        FailedMatch(Read r, Fail f, std::vector<const Node*> ns)
+        : read(std::move(r)), fail(f), nodes(std::move(ns))
         {}
     };
     static constexpr int maxsize = 500;
@@ -334,8 +413,9 @@ void ReadCounter::countReads(const std::string &file, const std::string &outpref
     sync.finishedMatching = true;
     sync.outqueueempty.notify_one();
     writer.join();
-    assert(m_read == m_counted + m_unmatched_total);
-    assert(m_unmatched_total == m_written);
+    assert(m_read == m_counted + m_unmatchedTotal);
+    assert(m_unmatchedTotal = m_unmatchedInsert + m_unmatchedBarcodes + m_unmatchedInsertSequence);
+    assert(m_unmatchedTotal == m_written);
 }
 
 uint64_t ReadCounter::read() const
@@ -346,6 +426,26 @@ uint64_t ReadCounter::read() const
 uint64_t ReadCounter::counted() const
 {
     return m_counted;
+}
+
+uint64_t ReadCounter::unmatchedTotal() const
+{
+    return m_unmatchedTotal;
+}
+
+uint64_t ReadCounter::unmatchedInsert() const
+{
+    return m_unmatchedInsert;
+}
+
+uint64_t ReadCounter::unmatchedBarcodes() const
+{
+    return m_unmatchedBarcodes;
+}
+
+uint64_t ReadCounter::unmatchedInsertSequence() const
+{
+    return m_unmatchedInsertSequence;
 }
 
 uint64_t ReadCounter::written() const
@@ -396,16 +496,15 @@ void ReadCounter::writeReads(const std::string &prefix, ThreadSynchronization *s
         fname.push_back(prefix);
         if (fmatch.fail == ThreadSynchronization::FailedMatch::Fail::insertFailed)
             fname.push_back("noinsert");
-        if (fmatch.fail == ThreadSynchronization::FailedMatch::Fail::insertMatchFailed || fmatch.fail & ThreadSynchronization::FailedMatch::Fail::revBarcodeFailed && !(fmatch.fail & ThreadSynchronization::FailedMatch::Fail::fwBarcodeFailed)) {
-            fname.push_back("fw");
-            fname.push_back(fmatch.barcode_fw);
+        else if (fmatch.fail == ThreadSynchronization::FailedMatch::Fail::barcodeFailed) {
+            fname.push_back("noBarcodeForInsert");
+            for (const auto &n : fmatch.nodes)
+                fname.push_back(n->sequence);
         }
-        if (fmatch.fail == ThreadSynchronization::FailedMatch::Fail::insertMatchFailed || fmatch.fail & ThreadSynchronization::FailedMatch::Fail::fwBarcodeFailed && !(fmatch.fail & ThreadSynchronization::FailedMatch::Fail::revBarcodeFailed)) {
-            fname.push_back("rev");
-            fname.push_back(fmatch.barcode_rev);
+        if (fmatch.fail == ThreadSynchronization::FailedMatch::Fail::insertMatchFailed) {
+            fname.push_back("noNamedInsertForExperiment");
+            fname.push_back(fmatch.nodes.back()->experiment->name);
         }
-        if (fmatch.fail == ThreadSynchronization::FailedMatch::Fail::insertMatchFailed)
-            fname.push_back("unmatched");
         auto it = fname.cbegin();
         std::string outfname = *it++;
         for (; it != fname.cend(); ++it)
@@ -433,114 +532,93 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
 {
     std::unique_lock<std::mutex> qlock(sync->inqueuemutex, std::defer_lock);
     std::unique_lock<std::mutex> oqlock(sync->outqueuemutex, std::defer_lock);
-    decltype(m_counts) localcounts;
 
-//     while (true) {
-//         qlock.lock();
-//         if (!sync->inqueue.size() && !sync->eof)
-//             sync->inqueueempty.wait(qlock, [&sync]{return sync->inqueue.size() || sync->eof;});
-//         if (sync->eof && !sync->inqueue.size()) {
-//             qlock.unlock();
-//             break;
-//         }
-//         Read rd(sync->inqueue.front());
-//         sync->inqueue.pop();
-//         qlock.unlock();
-//         sync->inqueuefull.notify_one();
-//
-//         int fail = ThreadSynchronization::FailedMatch::Fail::noFail;
-//         std::string fwkey;
-//         std::string revkey;
-//         std::string insert;
-//         for (const auto &i : m_matcher) {
-//             try {
-//                 auto insertmatch = i.second.match(rd, 1);
-//                 bool fwfound = true;
-//                 bool revfound = true;
-//                 if (!m_barcodes_fw || !m_barcodes_fw->count(i.first))
-//                     fwkey = dummykey;
-//                 else {
-//                     fwfound = false;
-//                     for (const auto &code : m_barcodes_fw->at(i.first)) {
-//                         for (const auto &seq : code.second) {
-//                             if (!rd.getSequence().compare(0, seq.size(), seq)) {
-//                                 fwfound = true;
-//                                 fwkey = code.first;
-//                                 break;
-//                             }
-//                         }
-//                         if (fwfound)
-//                             break;
-//                     }
-//                 }
-//                 if (!m_barcodes_rev || !m_barcodes_rev->count(i.first))
-//                     revkey = dummykey;
-//                 else {
-//                     revfound = false;
-//                     for (const auto &code : m_barcodes_rev->at(i.first)) {
-//                         for (const auto &seq : code.second) {
-//                             auto rdseq = rd.getSequence();
-//                             if (!rdseq.compare(rdseq.size() - seq.size(), seq.size(), seq)) {
-//                                 revfound = true;
-//                                 revkey = code.first;
-//                                 break;
-//                             }
-//                         }
-//                         if (revfound)
-//                             break;
-//                     }
-//                 }
-//
-//                 if (fwfound && revfound) {
-//                     auto seq = rd.getSequence().substr(insertmatch.first, insertmatch.second);
-//                     if (!m_inserts || !m_inserts->count(i.first) || m_inserts->at(i.first).count(seq)) {
-//                         ++localcounts[i.first][std::make_pair(fwkey, revkey)][seq];
-//                         fail = ThreadSynchronization::FailedMatch::Fail::noFail;
-//                     } else {
-//                         fail = ThreadSynchronization::FailedMatch::Fail::insertMatchFailed;
-//                     }
-//                 } else {
-//                     if (!fwfound) {
-//                         ++unmatched_fw;
-//                         fail |= ThreadSynchronization::FailedMatch::Fail::fwBarcodeFailed;
-//                     }
-//                     if (!revfound) {
-//                         ++unmatched_rev;
-//                         fail |= ThreadSynchronization::FailedMatch::Fail::revBarcodeFailed;
-//                     }
-//                 }
-//                 break;
-//             } catch (std::exception &e) {
-//                 fail = ThreadSynchronization::FailedMatch::Fail::insertFailed;
-//             }
-//         }
-//
-//         if (fail == ThreadSynchronization::FailedMatch::Fail::insertFailed)
-//             ++unmatched_insert;
-//         if (fail != ThreadSynchronization::FailedMatch::Fail::noFail) {
-//             ++unmatched_total;
-//             oqlock.lock();
-//             if (sync->outqueue.size() >= sync->maxsize)
-//                 sync->outqueuefull.wait(oqlock, [&sync]{return sync->outqueue.size() < sync->maxsize;});
-//             sync->outqueue.emplace(std::move(rd), fail, std::move(fwkey), std::move(revkey));
-//             oqlock.unlock();
-//             sync->outqueueempty.notify_one();
-//         }
-//     }
-//
-//     std::unique_lock<std::mutex> clock(sync->countsmutex);
-//     for (const auto &insname : localcounts) {
-//         for (const auto &codes : insname.second) {
-//             for (const auto &insert : codes.second) {
-//                 m_counts[insname.first][codes.first][insert.first] += insert.second;
-//                 m_counted += insert.second;
-//             }
-//         }
-//     }
-//     clock.unlock();
-}
+    std::unordered_map<Experiment*, Counts> localcounts;
+    uint64_t unmatchedInsert = 0;
+    uint64_t unmatchedBarcodes = 0;
+    uint64_t unmatchedInsertSequence = 0;
+    uint64_t unmatchedTotal = 0;
+    while (true) {
+        qlock.lock();
+        if (!sync->inqueue.size() && !sync->eof)
+            sync->inqueueempty.wait(qlock, [&sync]{return sync->inqueue.size() || sync->eof;});
+        if (sync->eof && !sync->inqueue.size()) {
+            qlock.unlock();
+            break;
+        }
+        Read rd(sync->inqueue.front());
+        sync->inqueue.pop();
+        qlock.unlock();
+        sync->inqueuefull.notify_one();
 
-const std::unordered_map<std::string, std::unordered_map<std::pair<std::string, std::string>, std::unordered_map<std::string, uint64_t>>>& ReadCounter::getCounts() const
-{
-    return m_counts;
+        ThreadSynchronization::FailedMatch::Fail fail = ThreadSynchronization::FailedMatch::Fail::noFail;
+        std::vector<const Node*> nodes;
+
+        std::string ins;
+        const Node *cn = nullptr;
+        for (const auto &n : m_tree) {
+            if (n->match(rd, &ins)) {
+                cn = n;
+            }
+        }
+        if (cn) {
+            nodes.push_back(cn);
+            while (!cn->experiment && cn->children.size()) {
+                bool found = false;
+                for (const auto &n : cn->children) {
+                    if (n->match(rd)) {
+                        cn = n;
+                        nodes.push_back(n);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                    break;
+            }
+            if (cn->experiment) {
+                if (nodes.size() != 3)
+                    throw std::logic_error("Unexpected number of tree levels: " + std::to_string(nodes.size()));
+
+                // using exact sequence matching at the moment, maybe add option for mismatches?
+                if (!cn->experiment->namedInserts.size() || cn->experiment->namedInserts.count(ins))
+                    ++localcounts[cn->experiment][std::make_pair(cn->experiment->fwBarcodeSet[nodes[1]->sequence], cn->experiment->revBarcodeSet[nodes[2]->sequence])][ins];
+                else {
+                    fail = ThreadSynchronization::FailedMatch::Fail::insertMatchFailed;
+                    ++unmatchedInsertSequence;
+                }
+            } else {
+                fail = ThreadSynchronization::FailedMatch::Fail::barcodeFailed;
+                ++unmatchedBarcodes;
+            }
+        } else {
+            fail = ThreadSynchronization::FailedMatch::Fail::insertFailed;
+            ++unmatchedInsert;
+        }
+
+        if (fail != ThreadSynchronization::FailedMatch::Fail::noFail) {
+            ++unmatchedTotal;
+            oqlock.lock();
+            if (sync->outqueue.size() >= sync->maxsize)
+                sync->outqueuefull.wait(oqlock, [&sync]{return sync->outqueue.size() < sync->maxsize;});
+            sync->outqueue.emplace(std::move(rd), fail, std::move(nodes));
+            oqlock.unlock();
+            sync->outqueueempty.notify_one();
+        }
+    }
+
+    std::unique_lock<std::mutex> clock(sync->countsmutex);
+    for (const auto &exp : localcounts) {
+        for (const auto &bcodes : exp.second) {
+            for (const auto &seq : bcodes.second) {
+                exp.first->counts[bcodes.first][seq.first] += seq.second;
+                m_counted += seq.second;
+            }
+        }
+    }
+    m_unmatchedTotal += unmatchedTotal;
+    m_unmatchedInsert += unmatchedInsert;
+    m_unmatchedBarcodes += unmatchedBarcodes;
+    m_unmatchedInsertSequence += unmatchedInsertSequence;
+    clock.unlock();
 }
