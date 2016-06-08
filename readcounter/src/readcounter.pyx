@@ -38,6 +38,7 @@ cdef extern from "cReadCounter.h" nogil:
         string insert
         SequenceSet fwBarcodeSet
         SequenceSet revBarcodeSet
+        SequenceSet namedInserts
         NDSIS ndsi
         SortedCellCounts sortedCells
         Counts counts
@@ -77,6 +78,9 @@ cdef class PyExperiment:
         if 'barcodes_rev' in d:
             for k,v in d['barcodes_rev'].items():
                 deref(self._exprmnt).revBarcodeSet[v.encode()] = k.encode()
+        if 'named_inserts' in d:
+            for k,v in d['named_inserts'].items():
+                deref(self._exprmnt).namedInserts[v.encode()] = k.encode()
         if 'ndsi' in d:
             haveNdsi = False
             if d['ndsi'] == 'forward':
@@ -93,6 +97,35 @@ cdef class PyExperiment:
                         deref(self._exprmnt).sortedCells[fw.encode()][r.encode()] = v
 
     @property
+    def counts_df(self):
+        countsdict = self.counts
+        insertsdict = self.named_inserts
+        experiment = []
+        barcode_fw = []
+        barcode_rev = []
+        sequence = []
+        counts = []
+
+        for codes, seqs in countsdict.items():
+            for seq, cnts in seqs.items():
+                experiment.append(self.name)
+                barcode_fw.append(codes[0])
+                barcode_rev.append(codes[1])
+                sequence.append(seq)
+                counts.append(cnts)
+        df = pd.DataFrame()
+        df['experiment'] = pd.Series(experiment, dtype='category')
+        df['barcode_fw'] = pd.Categorical(barcode_fw, categories=self.forward_barcodes.values())
+        df['barcode_rev'] = pd.Categorical(barcode_rev, categories=self.reverse_barcodes.values())
+        df['sequence'] = sequence
+        df['counts'] = counts
+
+        if len(self.named_inserts):
+            df['named_insert'] = [insertsdict[s] for s in sequence]
+
+        return df
+
+    @property
     def name(self):
         return deref(self._exprmnt).name
 
@@ -107,6 +140,10 @@ cdef class PyExperiment:
     @property
     def reverse_barcodes(self):
         return deref(self._exprmnt).revBarcodeSet
+
+    @property
+    def named_inserts(self):
+        return deref(self._exprmnt).namedInserts
 
     @property
     def ndsi(self):
@@ -138,42 +175,6 @@ cdef class PyReadCounter:
 
     def countReads(self, unicode fpath, unicode unmatchedpattern, threads=1):
         self._rdcntr.countReads(fpath.encode(), unmatchedpattern.encode(), threads)
-
-    #def asDataFrames(self):
-        #frames = {}
-
-        #countsdict = self.counts
-        #for ins, bcodes in countsdict.items():
-            #insert = []
-            #barcode_fw = []
-            #barcode_rev = []
-            #sequence = []
-            #counts = []
-            #for codes, seqs in bcodes.items():
-                #for seq, cnts in seqs.items():
-                    #insert.append(ins)
-                    #barcode_fw.append(codes[0])
-                    #barcode_rev.append(codes[1])
-                    #sequence.append(seq)
-                    #counts.append(cnts)
-            #df = pd.DataFrame()
-            #df['insert'] = pd.Series(insert, dtype='category')
-            #if self.fw is not None and ins in self.fw:
-                #df['barcode_fw'] = pd.Categorical(barcode_fw, categories=self.fw[ins].keys())
-            #else:
-                #df['barcode_fw'] = ''
-            #if self.rev is not None and ins in self.rev:
-                #df['barcode_rev'] = pd.Categorical(barcode_rev, categories=self.rev[ins].keys())
-            #else:
-                #df['barcode_rev'] = ''
-            #df['sequence'] = sequence
-
-            #if self.namedInserts and ins in self.namedInserts:
-                #df['named_insert'] = [self.namedInserts[ins][s] for s in sequence]
-
-            #df['counts'] = counts
-            #frames[ins] = df
-        #return frames
 
     @property
     def read(self):
