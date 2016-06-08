@@ -559,6 +559,7 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
         for (const auto &n : m_tree) {
             if (n->match(rd, &ins)) {
                 cn = n;
+                break;
             }
         }
         if (cn) {

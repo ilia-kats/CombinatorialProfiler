@@ -11,8 +11,11 @@ from libcpp.memory cimport shared_ptr
 from libc.stdint cimport *
 
 import csv
+from enum import Enum
 
 import pandas as pd
+
+
 
 cdef extern from "cReadCounter.h" nogil:
     ctypedef unordered_map[string, unordered_set[string]] InsertSet
@@ -22,10 +25,10 @@ cdef extern from "cReadCounter.h" nogil:
     ctypedef unordered_map[string, unordered_map[string, double]] SortedCellCounts
     ctypedef unordered_map[pair[string, string], unordered_map[string, uint64_t]] Counts
 
-    cdef enum NDSIS:
-        noNDSI
-        forward
-        reverse
+    cpdef enum NDSIS:
+        noNDSI = 0
+        forward = 1
+        reverse = 2
 
     cdef cppclass Experiment:
         Experiment() except+
@@ -107,7 +110,7 @@ cdef class PyExperiment:
 
     @property
     def ndsi(self):
-        return deref(self._exprmnt).ndsi
+        return NDSIS(deref(self._exprmnt).ndsi)
 
     @property
     def sorted_cells(self):
