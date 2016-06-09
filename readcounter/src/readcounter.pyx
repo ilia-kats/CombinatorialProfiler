@@ -185,6 +185,9 @@ cdef class PyReadCounter:
 
     def countReads(self, unicode fpath, unicode unmatchedpattern, threads=1):
         self._rdcntr.countReads(fpath.encode(), unmatchedpattern.encode(), threads)
+        assert self.read == self.counted + self.unmatched_total
+        assert self.unmatched_total == self.unmatched_insert + self.unmatched_barcodes + self.unmatched_insert_sequence
+        assert self.unmatched_total == self.written
 
     @property
     def read(self):

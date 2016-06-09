@@ -234,7 +234,7 @@ def getNDSI(df, nspec):
         return pd.Series({'median_ndsi': med, 'pooled_ndsi': pooled})
     def calcNDSInuc(group, ndsicol, fractionvals):
         g = group.set_index(ndsicol)
-        return ndsicalc(g['normalized_counts'], fractionvals)
+        return pd.Series({'ndsi':ndsicalc(g['normalized_counts'], fractionvals)})
 
     if nspec == NDSIS.forward:
         groupby = 'barcode_rev'
@@ -244,11 +244,11 @@ def getNDSI(df, nspec):
         ndsicol = 'barcode_rev'
     else:
         return None
-    groupby = ['experiment', groupby, 'translation']
+    groupbyl = ['experiment', groupby, 'translation']
     if 'named_insert' in df.columns:
-        groupby.append('named_insert')
+        groupbyl.append('named_insert')
     fractionvals = pd.Series(range(1, df[ndsicol].cat.categories.size + 1), index=sorted(df[ndsicol].cat.categories))
-    return (groupby, ndsicol, df.groupby(groupby).apply(calcNDSIaa, ndsicol, fractionvals).dropna().reset_index(), df.groupby(groupby + ['sequence']).apply(calcNDSInuc, ndsicol, fractionvals).dropna().reset_index())
+    return (groupby, ndsicol, df.groupby(groupbyl).apply(calcNDSIaa, ndsicol, fractionvals).dropna().reset_index(), df.groupby(groupbyl + ['sequence']).apply(calcNDSInuc, ndsicol, fractionvals).dropna().reset_index())
 
 if __name__ == '__main__':
     import argparse
@@ -334,6 +334,7 @@ if __name__ == '__main__':
                     fig = plt.figure(figsize=(5,3))
                     plot = plt.plot(group[ndsicol].map(integer_map), group['normalized_counts'], 'ko-')
                     plt.xlim(0, len(labels) - 1)
+                    plt.ylim(ymin=0)
                     plt.xticks(range(len(labels)), labels)
                     plt.title("%s %s" % (code, seq))
                     plt.ylabel("normalized counts")
