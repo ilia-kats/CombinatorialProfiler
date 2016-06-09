@@ -263,13 +263,23 @@ if __name__ == '__main__':
     parser.add_argument('--pear', required=True, help='Path to the PEAR binary. If not given, pear will be assumed to be in PATH')
     parser.add_argument('-t', '--threads', required=False, default=1, help='Number of threads to use',  type=int)
     parser.add_argument('-c', '--configuration', required=True, help='JSON configuration file.')
+    parser.add_argument('-r', '--resume', required=False, action='store_true', help='Resume aborted run? If intermediate files are found, they will be reused instead.')
     args = parser.parse_args()
 
-    fqcoutdir = os.path.join(args.outdir,'fastqc')
-    if not os.path.isdir(fqcoutdir):
-        os.makedirs(fqcoutdir)
-    #subprocess.run([args.fastqc, '--outdir=%s' % fqcoutdir, *args.fastq])
+    # do this right away to make the user immediately aware of any exceptions that might occur due to
+    # a malformed config file
+    experimentsdict = json.load(open(args.configuration))
+    experiments = []
+    for k,v in experimentsdict.items():
+        experiments.append(PyExperiment(k, v))
 
+    fqcoutdir = os.path.join(args.outdir,'fastqc')
+    if not args.resume or not os.path.isdir(fqcoutdir):
+        os.makedirs(fqcoutdir, exist_ok=True)
+        subprocess.run([args.fastqc, '--outdir=%s' % fqcoutdir, *args.fastq])
+
+    intermediate_outdir = os.path.join(args.outdir, 'intermediates')
+    os.makedirs(intermediate_outdir, exist_ok=True)
     fqnames = None
     bowtiefqname = None
     mergedfqname = None
@@ -286,27 +296,29 @@ if __name__ == '__main__':
             mergedfqname = fastq[0][b[0][0]:b[0][0]+b[0][2]]
 
     if not fqnames:
-        fqnames = ['sequence_%d.fastq' % i for i in range(1,3)]
+        fqnames = [os.path.join(intermediate_outdir, 'sequence_%d.fastq' % i) for i in range(1,3)]
         bowtiefqname = 'sequence_%.fastq'
         mergedfqname = 'sequence'
 
-    #with open(os.path.join(args.outdir, 'phix_alignment_summary.txt'), 'w') as phix_summary:
-        #subprocess.run([args.bowtie, '-p', str(args.threads), '--local', '--un-conc', os.path.join(args.outdir, bowtiefqname), '-x', args.phix_index, '-1', args.fastq[0], '-2', args.fastq[1], '-S', os.path.join(args.outdir, 'phix_alignment.sam'), '--met-file', os.path.join(args.outdir, 'phix_alignment_metrics.txt')], stderr=phix_summary)
+    bowtieout = os.path.join(intermediate_outdir, 'phix_alignment_summary.txt')
+    bowtiesam = os.path.join(intermediate_outdir, 'phix_alignment.sam')
+    bowtiemetrics = os.path.join(intermediate_outdir, 'phix_alignment_metrics.txt')
 
-    #with open(os.path.join(args.outdir, 'pear_summary.txt'), 'w') as pear_summary:
-        #subprocess.run([args.pear, '-j', str(args.threads), '-f', os.path.join(args.outdir, fqnames[0]), '-r', os.path.join(args.outdir, fqnames[1]), '-o', os.path.join(args.outdir, mergedfqname)], stdout=pear_summary)
+    if not args.resume or not os.path.isfile(bowtieout) or not os.path.isfile(bowtiesam) or not os.path.isfile(bowtiemetrics) or not os.path.isfile(fqnames[0]) or not os.path.isfile(fqnames[1]):
+        with open(bowtieout, 'w') as phix_summary:
+            subprocess.run([args.bowtie, '-p', str(args.threads), '--local', '--un-conc', os.path.join(intermediate_outdir, bowtiefqname), '-x', args.phix_index, '-1', args.fastq[0], '-2', args.fastq[1], '-S', bowtiesam, '--met-file', bowtiemetrics], stderr=phix_summary)
+
+    mergedfqpath = os.path.join(intermediate_outdir, mergedfqname)
+    pearout = os.path.join(intermediate_outdir, 'pear_summary.txt')
+    if not args.resume or not os.path.isfile(pearout) or not os.path.isfile(mergedfqpath):
+        with open(pearout, 'w') as pear_summary:
+            subprocess.run([args.pear, '-j', str(args.threads), '-f', os.path.join(intermediate_outdir, fqnames[0]), '-r', os.path.join(intermediate_outdir, fqnames[1]), '-o', mergedfqpath], stdout=pear_summary)
     mergedfqname += '.assembled.fastq'
 
-    experimentsdict = json.load(open(args.configuration))
-    experiments = []
-    for k,v in experimentsdict.items():
-        experiments.append(PyExperiment(k, v))
-
     unmatcheddir = os.path.join(args.outdir, "%s_unmapped" % mergedfqname)
-    if not os.path.isdir(unmatcheddir):
-        os.makedirs(unmatcheddir)
+    os.makedirs(unmatcheddir, exist_ok=True)
     counter = PyReadCounter(experiments)
-    counter.countReads(os.path.join(args.outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped"), args.threads)
+    counter.countReads(os.path.join(intermediate_outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped"), args.threads)
 
     for e in experiments:
         counts = e.counts_df
