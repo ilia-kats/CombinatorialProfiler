@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import sys
 import os
 import os.path
 import subprocess
 import csv
 import json
+import logging
+import time
 
 import pandas as pd
 import numpy as np
@@ -250,6 +253,34 @@ def getNDSI(df, nspec):
     fractionvals = pd.Series(range(1, df[ndsicol].cat.categories.size + 1), index=sorted(df[ndsicol].cat.categories))
     return (groupby, ndsicol, df.groupby(groupbyl).apply(calcNDSIaa, ndsicol, fractionvals).dropna().reset_index(), df.groupby(groupbyl + ['sequence']).apply(calcNDSInuc, ndsicol, fractionvals).dropna().reset_index())
 
+class PyExperimentJSONEncoder(json.JSONEncoder):
+    def default(self, o):
+        if type(o) != PyExperiment:
+            return super().default(o)
+        else:
+            return {o.name : o.toDict()}
+
+def exec_with_logging(args, pname, out=None, err=None):
+    logging.info("Starting %s" % pname)
+    logging.debug(" ".join(args))
+    if out:
+        outf = open(out, 'w')
+    else:
+        outf = sys.stdout
+    if err:
+        errf = open(err, 'w')
+    else:
+        errf = sys.stderr
+    ctime1 = time.monotonic()
+    ret = subprocess.run(args, stdout=outf, stderr=errf).returncode
+    ctime2 = time.monotonic()
+    infostr = "%s finished after %i seconds" % (pname, round(ctime2 - ctime1))
+    if not ret:
+        logging.info(infostr)
+    else:
+        logging.error("%s with returncode %i" % (infostr, ret))
+    return ret
+
 if __name__ == '__main__':
     import argparse
     import difflib
@@ -264,19 +295,33 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--threads', required=False, default=1, help='Number of threads to use',  type=int)
     parser.add_argument('-c', '--configuration', required=True, help='JSON configuration file.')
     parser.add_argument('-r', '--resume', required=False, action='store_true', help='Resume aborted run? If intermediate files are found, they will be reused instead.')
+    parser.add_argument('-l', '--log-level', required=False, default='INFO', choices=['ERROR', 'WARNING', 'INFO', 'DEBUG'])
     args = parser.parse_args()
+
+    os.makedirs(args.outdir, exist_ok=True)
+    logging.basicConfig(filename=os.path.join(args.outdir, 'run_log.txt'), filemode='w', format='%(levelname)s:%(asctime)s:%(message)s', level=getattr(logging, args.log_level))
+
+    logging.info(" ".join(sys.argv))
 
     # do this right away to make the user immediately aware of any exceptions that might occur due to
     # a malformed config file
     experimentsdict = json.load(open(args.configuration))
     experiments = []
     for k,v in experimentsdict.items():
-        experiments.append(PyExperiment(k, v))
+        exp = PyExperiment(k, v)
+        experiments.append(exp)
+        logging.debug(json.dumps(exp, indent=4, cls=PyExperimentJSONEncoder))
+
+    stime = time.monotonic()
 
     fqcoutdir = os.path.join(args.outdir,'fastqc')
+    os.makedirs(fqcoutdir, exist_ok=True)
     if not args.resume or not os.path.isdir(fqcoutdir):
-        os.makedirs(fqcoutdir, exist_ok=True)
-        subprocess.run([args.fastqc, '--outdir=%s' % fqcoutdir, *args.fastq])
+        args.resume = False
+        if exec_with_logging([args.fastqc, '--outdir=%s' % fqcoutdir, *args.fastq], "fastqc"):
+            sys.exit(1)
+    else:
+        logging.info("Found fastqc output and resume is requested, continuing")
 
     intermediate_outdir = os.path.join(args.outdir, 'intermediates')
     os.makedirs(intermediate_outdir, exist_ok=True)
@@ -291,13 +336,13 @@ if __name__ == '__main__':
             if len(b) == 2:
                 b.prepend((0,0,0))
             template = '%s{0}%s' % (fastq[0][b[0][0]:b[0][0]+b[0][2]], fastq[0][b[1][0]:b[1][0]+b[1][2]])
-            fqnames = [template.format(i) for i in range(1,3)]
-            bowtiefqname = template.format('%')
+            fqnames = [os.path.join(intermediate_outdir, template.format(i)) for i in range(1,3)]
+            bowtiefqname = os.path.join(intermediate_outdir, template.format('%'))
             mergedfqname = fastq[0][b[0][0]:b[0][0]+b[0][2]]
 
     if not fqnames:
         fqnames = [os.path.join(intermediate_outdir, 'sequence_%d.fastq' % i) for i in range(1,3)]
-        bowtiefqname = 'sequence_%.fastq'
+        bowtiefqname = os.path.join(intermediate_outdir, 'sequence_%.fastq')
         mergedfqname = 'sequence'
 
     bowtieout = os.path.join(intermediate_outdir, 'phix_alignment_summary.txt')
@@ -305,24 +350,38 @@ if __name__ == '__main__':
     bowtiemetrics = os.path.join(intermediate_outdir, 'phix_alignment_metrics.txt')
 
     if not args.resume or not os.path.isfile(bowtieout) or not os.path.isfile(bowtiesam) or not os.path.isfile(bowtiemetrics) or not os.path.isfile(fqnames[0]) or not os.path.isfile(fqnames[1]):
-        with open(bowtieout, 'w') as phix_summary:
-            subprocess.run([args.bowtie, '-p', str(args.threads), '--local', '--un-conc', os.path.join(intermediate_outdir, bowtiefqname), '-x', args.phix_index, '-1', args.fastq[0], '-2', args.fastq[1], '-S', bowtiesam, '--met-file', bowtiemetrics], stderr=phix_summary)
+        args.resume = False
+        if exec_with_logging([args.bowtie, '-p', str(args.threads), '--local', '--un-conc', bowtiefqname, '-x', args.phix_index, '-1', args.fastq[0], '-2', args.fastq[1], '-S', bowtiesam, '--met-file', bowtiemetrics], "bowtie2", err=bowtieout):
+            sys.exit(1)
+    else:
+        logging.info("Found bowtie2 output and resume is requested, continuing")
 
     mergedfqpath = os.path.join(intermediate_outdir, mergedfqname)
-    pearout = os.path.join(intermediate_outdir, 'pear_summary.txt')
-    if not args.resume or not os.path.isfile(pearout) or not os.path.isfile(mergedfqpath):
-        with open(pearout, 'w') as pear_summary:
-            subprocess.run([args.pear, '-j', str(args.threads), '-f', os.path.join(intermediate_outdir, fqnames[0]), '-r', os.path.join(intermediate_outdir, fqnames[1]), '-o', mergedfqpath], stdout=pear_summary)
     mergedfqname += '.assembled.fastq'
+    pearout = os.path.join(intermediate_outdir, 'pear_summary.txt')
+    if not args.resume or not os.path.isfile(pearout) or not os.path.isfile(os.path.join(intermediate_outdir, mergedfqname)):
+        args.resume = False
+        if exec_with_logging([args.pear, '-j', str(args.threads), '-f', fqnames[0], '-r', fqnames[1], '-o', mergedfqpath], "PEAR", out=pearout):
+            sys.exit(1)
+    else:
+        logging.info("Found PEAR output and resume is requested, continuing")
 
     unmatcheddir = os.path.join(args.outdir, "%s_unmapped" % mergedfqname)
     os.makedirs(unmatcheddir, exist_ok=True)
     counter = PyReadCounter(experiments)
+
+    logging.info("Starting counting reads")
+    ctime1 = time.monotonic()
     counter.countReads(os.path.join(intermediate_outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped"), args.threads)
+    ctime2 = time.monotonic()
+    logging.info("Finished counting reads after %i seconds" % round(ctime2 - ctime1))
+    logging.debug("Unique forward barcodes: %s" % json.dumps(counter.unique_forward_barcodes, indent=4))
+    logging.debug("Unique reverse barcodes: %s" % json.dumps(counter.unique_reverse_barcodes, indent=4))
 
     for e in experiments:
         counts = e.counts_df
         if len(e.sorted_cells):
+            logging.info("Normalizing counts for experiment %s" % e.name)
             counts = normalizeCounts(counts, e.sorted_cells_df)
         counts['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in counts.itertuples()])
 
@@ -331,8 +390,14 @@ if __name__ == '__main__':
         else:
             prefix = "%s_" % e.name
         counts.to_csv(os.path.join(args.outdir, "%sraw_counts.csv" % prefix), index=False, encoding='utf-8')
+
         if e.ndsi != NDSIS.noNDSI:
+            logging.info("Calculating NDSIs for experiment %s" % e.name)
+            ctime1 = time.monotonic()
             groupby, ndsicol, ndsi_byaa, ndsi_bynuc = getNDSI(counts, e.ndsi)
+            ctime2 = time.monotonic()
+            logging.info("Finished calculating NDSIs after %i seconds" % round(ctime2 - ctime1))
+
             ndsi_byaa.to_csv(os.path.join(args.outdir, "%sNDSIs_byaa.csv" % prefix), index=False, encoding='utf-8')
             ndsi_bynuc.to_csv(os.path.join(args.outdir, "%sNDSIs_bynuc.csv" % prefix), index=False, encoding='utf-8')
             labels = sorted(counts[ndsicol].cat.categories)
@@ -341,6 +406,9 @@ if __name__ == '__main__':
                 seqcol = 'named_insert'
             else:
                 seqcol = 'sequence'
+
+            logging.info("Plotting read count profiles for experiment %s" % e.name)
+            ctime1 = time.monotonic()
             with PdfPages(os.path.join(args.outdir, "%scountplots.pdf" % prefix)) as pdf:
                 for (code, seq), group in counts.groupby([groupby, seqcol]):
                     fig = plt.figure(figsize=(5,3))
@@ -352,3 +420,5 @@ if __name__ == '__main__':
                     plt.ylabel("normalized counts")
                     pdf.savefig(bbox_inches='tight')
                     plt.close()
+            ctime2 = time.monotonic()
+            logging.info("Finished plotting read count profiles after %i seconds" % round(ctime2 - ctime1))

@@ -18,6 +18,7 @@ template<> struct hash<std::pair<std::string, std::string>>
 typedef std::unordered_map<std::string, std::string> SequenceSet;
 typedef std::unordered_map<std::string, std::unordered_map<std::string, double>> SortedCellCounts;
 typedef std::unordered_map<std::pair<std::string, std::string>, std::unordered_map<std::string, uint64_t>> Counts;
+typedef std::unordered_map<std::string, std::vector<std::string>> UniqueBarcodes;
 
 enum NDSIS {noNDSI = 0, forward = 1, reverse = 2};
 class Experiment
@@ -57,6 +58,9 @@ public:
     uint64_t unmatchedInsertSequence() const;
     uint64_t written() const;
 
+    UniqueBarcodes uniqueForwardBarcodes() const;
+    UniqueBarcodes uniqueReverseBarcodes() const;
+
 private:
     struct ThreadSynchronization;
 
@@ -72,6 +76,8 @@ private:
 
     std::vector<InsertNode*> m_tree;
     std::vector<Node*> m_nodes;
+    UniqueBarcodes m_uniqueFwCodes;
+    UniqueBarcodes m_uniqueRevCodes;
 
     void readFile(const std::string&, ThreadSynchronization*);
     void matchRead(ThreadSynchronization*);

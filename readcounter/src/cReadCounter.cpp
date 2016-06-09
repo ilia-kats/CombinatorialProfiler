@@ -266,7 +266,7 @@ private:
     uint16_t m_insertlength;
 };
 
-std::unordered_map<std::string, std::vector<std::string>> makeUnique(const std::unordered_set<std::string> &codes)
+UniqueBarcodes makeUnique(const std::unordered_set<std::string> &codes)
 {
     std::unordered_map<std::string, std::vector<std::string>> uniqueCodes;
     for (const auto &c : codes) {
@@ -307,8 +307,8 @@ ReadCounter::ReadCounter(std::vector<Experiment*> experiments)
             revCodes.insert(c.first);
     }
 
-    std::unordered_map<std::string, std::vector<std::string>> uniqueFwCodes = makeUnique(fwCodes);
-    std::unordered_map<std::string, std::vector<std::string>> uniqueRevCodes = makeUnique(revCodes);
+    m_uniqueFwCodes = makeUnique(fwCodes);
+    m_uniqueRevCodes = makeUnique(revCodes);
 
     std::unordered_map<std::string, std::unordered_map<std::string, BarcodeNode*>> fwNodes;
     std::unordered_map<std::string,BarcodeNode*> dummyNodes;
@@ -316,7 +316,7 @@ ReadCounter::ReadCounter(std::vector<Experiment*> experiments)
     for (const auto &exp : m_experiments) {
         std::vector<BarcodeNode*> revNodes;
         for (const auto &c : exp->revBarcodeSet) {
-            BarcodeNode *n = new RevBarcodeNode(c.first, uniqueRevCodes[c.first]);
+            BarcodeNode *n = new RevBarcodeNode(c.first, m_uniqueRevCodes[c.first]);
             n->experiment = exp;
             revNodes.push_back(n);
             m_nodes.push_back(n);
@@ -324,7 +324,7 @@ ReadCounter::ReadCounter(std::vector<Experiment*> experiments)
 
         for (const auto &c : exp->fwBarcodeSet) {
             if (!fwNodes[exp->insert].count(c.first)) {
-                BarcodeNode *n = new FwBarcodeNode(c.first, uniqueFwCodes[c.first]);
+                BarcodeNode *n = new FwBarcodeNode(c.first, m_uniqueFwCodes[c.first]);
                 fwNodes[exp->insert][c.first] = n;
                 m_nodes.push_back(n);
                 inserts[exp->insert]->children.push_back(n);
@@ -451,6 +451,16 @@ uint64_t ReadCounter::unmatchedInsertSequence() const
 uint64_t ReadCounter::written() const
 {
     return m_written;
+}
+
+UniqueBarcodes ReadCounter::uniqueForwardBarcodes() const
+{
+    return m_uniqueFwCodes;
+}
+
+UniqueBarcodes ReadCounter::uniqueReverseBarcodes() const
+{
+    return m_uniqueRevCodes;
 }
 
 void ReadCounter::readFile(const std::string &file, ThreadSynchronization *sync)

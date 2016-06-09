@@ -21,6 +21,7 @@ cdef extern from "cReadCounter.h" nogil:
     ctypedef unordered_map[string, string] SequenceSet
     ctypedef unordered_map[string, unordered_map[string, double]] SortedCellCounts
     ctypedef unordered_map[pair[string, string], unordered_map[string, uint64_t]] Counts
+    ctypedef unordered_map[string, vector[string]] UniqueBarcodes
 
     cpdef enum NDSIS:
         noNDSI = 0
@@ -51,6 +52,9 @@ cdef extern from "cReadCounter.h" nogil:
         uint64_t counted()
         uint64_t written()
 
+        UniqueBarcodes uniqueForwardBarcodes()
+        UniqueBarcodes uniqueReverseBarcodes()
+
 cdef class PyExperiment:
     cdef Experiment *_exprmnt
 
@@ -66,32 +70,47 @@ cdef class PyExperiment:
 
     def fromDict(self, d):
         if 'insert' in d:
-            deref(self._exprmnt).insert = d['insert'].encode()
+            self._exprmnt.insert = d['insert'].encode()
         else:
-            raise RuntimeError("Insert sequence missing from experiment %s" % deref(self._exprmnt).name)
+            raise RuntimeError("Insert sequence missing from experiment %s" % self._exprmnt.name)
         if 'barcodes_fw' in d:
             for k, v in d['barcodes_fw'].items():
-                deref(self._exprmnt).fwBarcodeSet[v.encode()] = k.encode()
+                self._exprmnt.fwBarcodeSet[v.encode()] = k.encode()
         if 'barcodes_rev' in d:
             for k,v in d['barcodes_rev'].items():
-                deref(self._exprmnt).revBarcodeSet[v.encode()] = k.encode()
+                self._exprmnt.revBarcodeSet[v.encode()] = k.encode()
         if 'named_inserts' in d:
             for k,v in d['named_inserts'].items():
-                deref(self._exprmnt).namedInserts[v.encode()] = k.encode()
+                self._exprmnt.namedInserts[v.encode()] = k.encode()
         if 'ndsi' in d:
             haveNdsi = False
             if d['ndsi'] == 'forward':
-                deref(self._exprmnt).ndsi = forward
+                self._exprmnt.ndsi = forward
                 haveNdsi = True
             elif d['ndsi'] == 'reverse':
-                deref(self._exprmnt).ndsi = reverse
+                self._exprmnt.ndsi = reverse
                 haveNdsi = True
             else:
-                deref(self._exprmnt).ndsi = noNDSI
+                self._exprmnt.ndsi = noNDSI
             if haveNdsi and 'sortedcells' in d:
                 for fw, revs in d['sortedcells'].items():
                     for r, v in revs.items():
-                        deref(self._exprmnt).sortedCells[fw.encode()][r.encode()] = v
+                        self._exprmnt.sortedCells[fw.encode()][r.encode()] = v
+    def toDict(self):
+        d = {}
+        d['insert'] = self._exprmnt.insert
+        d['barcodes_fw'] = self._exprmnt.fwBarcodeSet
+        d['barcodes_rev'] = self._exprmnt.revBarcodeSet
+        d['named_inserts'] = self._exprmnt.namedInserts
+        if self._exprmnt.ndsi == forward:
+            d['ndsi'] = 'forward'
+        elif self._exprmnt.ndsi == reverse:
+            d['ndsi'] = 'reverse'
+        d['sortedcells'] = self._exprmnt.sortedCells
+        return d
+
+    def __repr__(self):
+        return "PyExperiment %s:\n%s" % (self._exprmnt.name, self.toDict())
 
     @property
     def counts_df(self):
@@ -137,35 +156,35 @@ cdef class PyExperiment:
 
     @property
     def name(self):
-        return deref(self._exprmnt).name
+        return self._exprmnt.name
 
     @property
     def insert(self):
-        return deref(self._exprmnt).insert
+        return self._exprmnt.insert
 
     @property
     def forward_barcodes(self):
-        return deref(self._exprmnt).fwBarcodeSet
+        return self._exprmnt.fwBarcodeSet
 
     @property
     def reverse_barcodes(self):
-        return deref(self._exprmnt).revBarcodeSet
+        return self._exprmnt.revBarcodeSet
 
     @property
     def named_inserts(self):
-        return deref(self._exprmnt).namedInserts
+        return self._exprmnt.namedInserts
 
     @property
     def ndsi(self):
-        return NDSIS(deref(self._exprmnt).ndsi)
+        return NDSIS(self._exprmnt.ndsi)
 
     @property
     def sorted_cells(self):
-        return deref(self._exprmnt).sortedCells
+        return self._exprmnt.sortedCells
 
     @property
     def counts(self):
-        return deref(self._exprmnt).counts
+        return self._exprmnt.counts
 
 
 cdef class PyReadCounter:
@@ -216,4 +235,12 @@ cdef class PyReadCounter:
     @property
     def written(self):
         return self._rdcntr.written()
+
+    @property
+    def unique_forward_barcodes(self):
+        return self._rdcntr.uniqueForwardBarcodes()
+
+    @property
+    def unique_reverse_barcodes(self):
+        return self._rdcntr.uniqueReverseBarcodes()
 
