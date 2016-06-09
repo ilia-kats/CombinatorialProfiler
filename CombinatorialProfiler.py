@@ -4,6 +4,7 @@ import os
 import os.path
 import subprocess
 import csv
+import json
 
 import pandas as pd
 import numpy as np
@@ -13,7 +14,7 @@ import matplotlib.pyplot as plt
 import Bio.Seq
 import Bio.Alphabet
 
-from readcounter.readcounter import PyReadCounter
+from readcounter.readcounter import PyReadCounter, PyExperiment, NDSIS
 
 def dict_merge(dicts):
     dct = dicts.pop()
@@ -214,35 +215,40 @@ def mergeInserts(ins, barcodes_fw, barcodes_rev):
     return ins
 
 def normalizeCounts(df, sortedcells):
-    df = df.set_index(['insert','barcode_fw', 'barcode_rev','sequence'])
-    df['normalized_counts'] = (df['counts'] / df.groupby(level=['barcode_fw', 'barcode_rev'])['counts'].transform(sum)).unstack(['insert','sequence']).mul(sortedcells, axis=0).stack(['insert','sequence']).reorder_levels(df.index.names).dropna()
+    df = df.set_index(['experiment','barcode_fw', 'barcode_rev','sequence'])
+    df['normalized_counts'] = (df['counts'] / df.groupby(level=['barcode_fw', 'barcode_rev'])['counts'].transform(sum)).unstack(['experiment','sequence']).mul(sortedcells, axis=0).stack(['experiment','sequence']).reorder_levels(df.index.names).dropna()
     df = df.reset_index()
-    df['insert'] = df['insert'].astype("category")
+    df['experiment'] = df['experiment'].astype("category")
     df.barcode_fw = df.barcode_fw.astype("category")
     df.barcode_rev = df.barcode_rev.astype("category")
     return df
 
 def getNDSI(df, nspec):
-    def calcNDSI(group, ndsicol, fractionvals):
-        calc = lambda x: sum((x * fractionvals).dropna()) / sum(x)
-        g = group.set_index(ndsicol)
-        pooled = calc(g.groupby(level=ndsicol)['normalized_counts'].sum().dropna())
-        med = g.groupby('sequence')['normalized_counts'].aggregate(calc).median()
-        return pd.Series({'median_ndsi': med, 'pooled_ndsi': pooled})
+    def ndsicalc(x, fractionvals):
+        return sum((x * fractionvals).dropna()) / sum(x)
 
-    insert, direction = split_spec(nspec)
-    if insert not in df:
-        raise RuntimeError("No data for NDSI calculation: %s" % insert)
-    elif direction != "forward" and direction != "reverse":
-        raise RuntimeError("Unrecognized direction")
-    elif direction == "forward":
+    def calcNDSIaa(group, ndsicol, fractionvals):
+        g = group.set_index(ndsicol)
+        pooled = ndsicalc(g.groupby(level=ndsicol)['normalized_counts'].sum().dropna(), fractionvals)
+        med = g.groupby('sequence')['normalized_counts'].aggregate(ndsicalc, fractionvals).median()
+        return pd.Series({'median_ndsi': med, 'pooled_ndsi': pooled})
+    def calcNDSInuc(group, ndsicol, fractionvals):
+        g = group.set_index(ndsicol)
+        return ndsicalc(g['normalized_counts'], fractionvals)
+
+    if nspec == NDSIS.forward:
         groupby = 'barcode_rev'
         ndsicol = 'barcode_fw'
-    else:
+    elif nspec == NDSIS.reverse:
         groupby = 'barcode_fw'
         ndsicol = 'barcode_rev'
-    fractionvals = pd.Series(range(1, df[insert][ndsicol].cat.categories.size + 1), index=sorted(df[insert][ndsicol].cat.categories))
-    return (insert, groupby, ndsicol, df[insert].groupby([groupby, 'translation']).apply(calcNDSI, ndsicol, fractionvals).dropna().reset_index())
+    else:
+        return None
+    groupby = ['experiment', groupby, 'translation']
+    if 'named_insert' in df.columns:
+        groupby.append('named_insert')
+    fractionvals = pd.Series(range(1, df[ndsicol].cat.categories.size + 1), index=sorted(df[ndsicol].cat.categories))
+    return (groupby, ndsicol, df.groupby(groupby).apply(calcNDSIaa, ndsicol, fractionvals).dropna().reset_index(), df.groupby(groupby + ['sequence']).apply(calcNDSInuc, ndsicol, fractionvals).dropna().reset_index())
 
 if __name__ == '__main__':
     import argparse
@@ -256,13 +262,7 @@ if __name__ == '__main__':
     parser.add_argument('--phix_index', required=True, help='Path to the bowtie index of the PhiX genome.')
     parser.add_argument('--pear', required=True, help='Path to the PEAR binary. If not given, pear will be assumed to be in PATH')
     parser.add_argument('-t', '--threads', required=False, default=1, help='Number of threads to use',  type=int)
-    parser.add_argument('-f', '--forward-barcodes', required=False, action='append', help='File containing forward barcodes. Must be csv-like with column 1 containing the name and column 2 the barcode')
-    parser.add_argument('-r', '--reverse-barcodes', required=False, action='append', help='File containing reverse barcodes. Must be csv-like with column 1 containing the name and column 2 the barcode')
-    parser.add_argument('-i', '--insert-sequence', required=False, action='append', help='Either an insert sequence to match against or path to a csv-like file with column 1 containing the name and column 2 the sequence. Variable region must be marked with a sequence of Ns')
-    parser.add_argument('-n', '--named-inserts', required=False, action='append', help='Named sequences of allowed variable sequences within the insert. Csv-like file with the first column containing the name and the second column the sequence')
-    parser.add_argument('-s', '--sorted-cells', required=False, action='append', help='Path to a CSV file containing the relative amounts of sorted cells per barcode combination')
-    parser.add_argument('--ndsi', action='append', required=False, help='Whether to use forward or reverse barcodes as FACS fractions for NDSI calculation.')
-
+    parser.add_argument('-c', '--configuration', required=True, help='JSON configuration file.')
     args = parser.parse_args()
 
     fqcoutdir = os.path.join(args.outdir,'fastqc')
@@ -297,57 +297,40 @@ if __name__ == '__main__':
         #subprocess.run([args.pear, '-j', str(args.threads), '-f', os.path.join(args.outdir, fqnames[0]), '-r', os.path.join(args.outdir, fqnames[1]), '-o', os.path.join(args.outdir, mergedfqname)], stdout=pear_summary)
     mergedfqname += '.assembled.fastq'
 
-    if args.forward_barcodes:
-        fwcodes = generateBarcodes(dict_merge([readBarcodes(c) for c in args.forward_barcodes]))
-    else:
-        fwcodes = None
-    if args.reverse_barcodes:
-        revcodes = generateBarcodes(dict_merge([readBarcodes(c, True) for c in args.reverse_barcodes]))
-    else:
-        revcodes = None
+    experimentsdict = json.load(open(args.configuration))
+    experiments = []
+    for k,v in experimentsdict.items():
+        experiments.append(PyExperiment(k, v))
 
-    if args.named_inserts:
-        ninserts = mergeInserts(dict_merge([readNamedInserts(i) for i in args.named_inserts]), fwcodes, revcodes)
-    else:
-        ninserts = None
     unmatcheddir = os.path.join(args.outdir, "%s_unmapped" % mergedfqname)
     if not os.path.isdir(unmatcheddir):
         os.makedirs(unmatcheddir)
-    counter = PyReadCounter(dict_merge([readInserts(ins) for ins in args.insert_sequence]), fwcodes, revcodes, ninserts)
+    counter = PyReadCounter(experiments)
     counter.countReads(os.path.join(args.outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped"), args.threads)
 
-    df = counter.asDataFrames()
+    for e in experiments:
+        counts = e.counts_df
+        if len(e.sorted_cells):
+            counts = normalizeCounts(counts, e.sorted_cells_df)
+        counts['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in counts.itertuples()])
 
-    if args.sorted_cells:
-        sortedcells = dict_merge([readCellCounts(c, fwcodes, revcodes) for c in args.sorted_cells])
-        for i,v in df.items():
-            if i in sortedcells:
-                df[i] = normalizeCounts(v, sortedcells[i])
-
-    for i, v in df.items():
-        if not len(i):
+        if not len(e.name):
             prefix = ''
         else:
-            prefix = "%s_" % i
-        v['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in v.itertuples()])
-        v.to_csv(os.path.join(args.outdir, "%sraw_counts.csv" % prefix), index=False, encoding='utf-8')
-
-    if args.ndsi:
-        for n in args.ndsi:
-            ins, groupby, ndsicol, ndsi = getNDSI(df, n)
-            if not len(ins):
-                prefix = ''
-            else:
-                prefix = "%s_" % i
-            ndsi.to_csv(os.path.join(args.outdir, "%sNDSIs.csv" % prefix), index=False, encoding='utf-8')
-            labels = sorted(df[ins][ndsicol].cat.categories)
+            prefix = "%s_" % e.name
+        counts.to_csv(os.path.join(args.outdir, "%sraw_counts.csv" % prefix), index=False, encoding='utf-8')
+        if e.ndsi != NDSIS.noNDSI:
+            groupby, ndsicol, ndsi_byaa, ndsi_bynuc = getNDSI(counts, e.ndsi)
+            ndsi_byaa.to_csv(os.path.join(args.outdir, "%sNDSIs_byaa.csv" % prefix), index=False, encoding='utf-8')
+            ndsi_bynuc.to_csv(os.path.join(args.outdir, "%sNDSIs_bynuc.csv" % prefix), index=False, encoding='utf-8')
+            labels = sorted(counts[ndsicol].cat.categories)
             integer_map = dict([(val, i) for i, val in enumerate(labels)])
-            if 'named_insert' in df[ins]:
+            if 'named_insert' in counts:
                 seqcol = 'named_insert'
             else:
                 seqcol = 'sequence'
             with PdfPages(os.path.join(args.outdir, "%scountplots.pdf" % prefix)) as pdf:
-                for (code, seq), group in df[ins].groupby([groupby, seqcol]):
+                for (code, seq), group in counts.groupby([groupby, seqcol]):
                     fig = plt.figure(figsize=(5,3))
                     plot = plt.plot(group[ndsicol].map(integer_map), group['normalized_counts'], 'ko-')
                     plt.xlim(0, len(labels) - 1)
@@ -356,4 +339,3 @@ if __name__ == '__main__':
                     plt.ylabel("normalized counts")
                     pdf.savefig(bbox_inches='tight')
                     plt.close()
-

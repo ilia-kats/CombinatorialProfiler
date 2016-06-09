@@ -10,9 +10,6 @@ from libcpp.utility cimport pair
 from libcpp.memory cimport shared_ptr
 from libc.stdint cimport *
 
-import csv
-from enum import Enum
-
 import pandas as pd
 
 
@@ -124,6 +121,19 @@ cdef class PyExperiment:
             df['named_insert'] = [insertsdict[s] for s in sequence]
 
         return df
+
+    @property
+    def sorted_cells_df(self):
+        countsdict = self.sorted_cells
+        barcode_fw = []
+        barcode_rev = []
+        counts = []
+        for fw, cc in countsdict.items():
+            for rev, c in cc.items():
+                barcode_fw.append(fw)
+                barcode_rev.append(rev)
+                counts.append(c)
+        return pd.Series(counts, index=pd.MultiIndex.from_arrays((barcode_fw, barcode_rev), names=('barcode_fw', 'barcode_rev')))
 
     @property
     def name(self):

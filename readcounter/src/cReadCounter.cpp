@@ -512,7 +512,7 @@ void ReadCounter::writeReads(const std::string &prefix, ThreadSynchronization *s
 
         outfname.append(".fastq");
         if (!files[outfname].is_open())
-            files[outfname].open(outfname);
+            files[outfname].open(outfname, std::ios_base::ate);
         files[outfname] << fmatch.read.getName() << std::endl << fmatch.read.getSequence() << std::endl << fmatch.read.getDescription() << std::endl << fmatch.read.getQuality() << std::endl;
         ++m_written;
     }
