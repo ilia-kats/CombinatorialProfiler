@@ -31,7 +31,7 @@ class debugmode(develop):
 
 setup(name='CombinatorialProfiler',
     packages=['combinatorialprofiler'],
-    install_requires=['numpy', 'pandas'],
+    install_requires=['numpy', 'pandas', 'matplotlib', 'biopython'],
     entry_points={
         'console_scripts': ['CombinatorialProfiler=combinatorialprofiler.CombinatorialProfiler:main'],
         'gui_scripts':['CombinatorialProfilerGUI=combinatorialprofiler.ui.CProfilerGUI:main']
