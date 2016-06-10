@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import Bio.Seq
 import Bio.Alphabet
 
-from readcounter import PyReadCounter, PyExperiment, NDSIS
+from .readcounter import PyReadCounter, PyExperiment, NDSIS
 
 def dict_merge(dicts):
     dct = dicts.pop()

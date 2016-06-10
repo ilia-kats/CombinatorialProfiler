@@ -9,7 +9,7 @@ from setuptools import setup
 from setuptools.extension import Extension
 from setuptools.command.develop import develop
 
-readcounter = Extension("readcounter",
+readcounter = Extension("combinatorialprofiler.readcounter",
         sources=["combinatorialprofiler/readcounter/readcounter.cpp", "combinatorialprofiler/readcounter/cReadCounter.cpp"],
         language="c++",
         extra_compile_args=["-std=c++14"],

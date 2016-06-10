@@ -1,7 +1,7 @@
 import random
 import time
 
-from readcounter import PyExperiment, PyReadCounter
+from combinatorialprofiler.readcounter import PyExperiment, PyReadCounter
 
 random.seed(42)
 
