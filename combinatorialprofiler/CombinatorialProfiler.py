@@ -11,6 +11,8 @@ import time
 
 import pandas as pd
 import numpy as np
+import matplotlib as mpl
+mpl.use('PDF')
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 
