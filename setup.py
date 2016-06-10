@@ -42,5 +42,8 @@ setup(name='CombinatorialProfiler',
     ext_modules = [readcounter],
     cmdclass={
         'develop': debugmode
-    }
+    },
+    zip_safe = True,
+    setup_requires=['pytest-runner'],
+    tests_require=['pytest'],
 )
