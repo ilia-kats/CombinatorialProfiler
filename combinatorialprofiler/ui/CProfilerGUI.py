@@ -5,19 +5,17 @@ import os.path
 import sys
 import json
 
+from pkg_resources import resource_stream
+
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QListWidgetItem, QTableWidgetItem, QDialogButtonBox, QFileDialog
 from PyQt5.QtCore import QRegExp, Qt
 from PyQt5.QtGui import QDoubleValidator, QRegExpValidator
 from PyQt5 import uic
 
-uidir = os.path.join(os.path.dirname(__file__))
-sys.path.append(uidir)
-
 from .simpledelegate import SimpleDelegate
 
 class ExperimentWidget(QWidget):
-    uifile = os.path.join(uidir, "experiment.ui")
-    ui = uic.loadUiType(uifile)
+    ui = uic.loadUiType(resource_stream(__name__, "experiment.ui"))
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -116,8 +114,7 @@ class ExperimentWidget(QWidget):
 
 
 class MainWidget(QWidget):
-    uifile = os.path.join(uidir, "main.ui")
-    ui = uic.loadUiType(uifile)
+    ui = uic.loadUiType(resource_stream(__name__, "main.ui"))
 
     def __init__(self, parent=None):
         super().__init__(parent)

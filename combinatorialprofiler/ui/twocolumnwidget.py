@@ -1,15 +1,17 @@
 #-*- coding: utf-8 -*-
 import os.path
+
+from pkg_resources import resource_stream
+
 from PyQt5.QtWidgets import QWidget, QTableWidgetItem
 from PyQt5.QtCore import QRegExp, Qt, pyqtSignal
 from PyQt5.QtGui import QRegExpValidator
 from PyQt5 import uic
 
-from simpledelegate import SimpleDelegate
+from .simpledelegate import SimpleDelegate
 
 class TwoColumnWidget(QWidget):
-    uifile = os.path.join(os.path.dirname(__file__), "twocolumnwidget.ui")
-    ui = uic.loadUiType(uifile)
+    ui = uic.loadUiType(resource_stream(__name__, "twocolumnwidget.ui"))
 
     rowAdded = pyqtSignal(int, 'QString')
     rowRemoved = pyqtSignal(int)

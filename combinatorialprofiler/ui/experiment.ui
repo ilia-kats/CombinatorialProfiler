@@ -156,7 +156,7 @@
   <customwidget>
    <class>TwoColumnWidget</class>
    <extends>QWidget</extends>
-   <header location="global">twocolumnwidget.h</header>
+   <header>combinatorialprofiler.ui.twocolumnwidget</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
