@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import Bio.Seq
 import Bio.Alphabet
 
-from readcounter.readcounter import PyReadCounter, PyExperiment, NDSIS
+from readcounter import PyReadCounter, PyExperiment, NDSIS
 
 def dict_merge(dicts):
     dct = dicts.pop()
@@ -281,7 +281,7 @@ def exec_with_logging(args, pname, out=None, err=None):
         logging.error("%s with returncode %i" % (infostr, ret))
     return ret
 
-if __name__ == '__main__':
+def main():
     import argparse
     import difflib
 
@@ -319,7 +319,7 @@ if __name__ == '__main__':
     if not args.resume or not os.path.isdir(fqcoutdir):
         args.resume = False
         if exec_with_logging([args.fastqc, '--outdir=%s' % fqcoutdir, *args.fastq], "fastqc"):
-            sys.exit(1)
+            return 1
     else:
         logging.info("Found fastqc output and resume is requested, continuing")
 
@@ -352,7 +352,7 @@ if __name__ == '__main__':
     if not args.resume or not os.path.isfile(bowtieout) or not os.path.isfile(bowtiesam) or not os.path.isfile(bowtiemetrics) or not os.path.isfile(fqnames[0]) or not os.path.isfile(fqnames[1]):
         args.resume = False
         if exec_with_logging([args.bowtie, '-p', str(args.threads), '--local', '--un-conc', bowtiefqname, '-x', args.phix_index, '-1', args.fastq[0], '-2', args.fastq[1], '-S', bowtiesam, '--met-file', bowtiemetrics], "bowtie2", err=bowtieout):
-            sys.exit(1)
+            return 1
     else:
         logging.info("Found bowtie2 output and resume is requested, continuing")
 
@@ -362,7 +362,7 @@ if __name__ == '__main__':
     if not args.resume or not os.path.isfile(pearout) or not os.path.isfile(os.path.join(intermediate_outdir, mergedfqname)):
         args.resume = False
         if exec_with_logging([args.pear, '-j', str(args.threads), '-f', fqnames[0], '-r', fqnames[1], '-o', mergedfqpath], "PEAR", out=pearout):
-            sys.exit(1)
+            return 1
     else:
         logging.info("Found PEAR output and resume is requested, continuing")
 
@@ -422,3 +422,4 @@ if __name__ == '__main__':
                     plt.close()
             ctime2 = time.monotonic()
             logging.info("Finished plotting read count profiles after %i seconds" % round(ctime2 - ctime1))
+    return 0

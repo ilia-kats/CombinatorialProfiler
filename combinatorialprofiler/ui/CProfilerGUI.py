@@ -10,10 +10,10 @@ from PyQt5.QtCore import QRegExp, Qt
 from PyQt5.QtGui import QDoubleValidator, QRegExpValidator
 from PyQt5 import uic
 
-uidir = os.path.join(os.path.dirname(__file__), "ui")
+uidir = os.path.join(os.path.dirname(__file__))
 sys.path.append(uidir)
 
-from simpledelegate import SimpleDelegate
+from .simpledelegate import SimpleDelegate
 
 class ExperimentWidget(QWidget):
     uifile = os.path.join(uidir, "experiment.ui")
@@ -166,10 +166,10 @@ class MainWindow(QMainWindow):
         self.widget = MainWidget(parent)
         self.setCentralWidget(self.widget)
 
-if __name__ == '__main__':
+def main():
     app = QApplication(sys.argv)
     main = MainWindow()
     main.resize(1024, 768)
     main.show()
     main.widget.ui.splitter.setSizes((10,1))
-    app.exec()
+    return app.exec()
