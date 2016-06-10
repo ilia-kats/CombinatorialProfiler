@@ -1,6 +1,23 @@
 from setuptools import setup
 from setuptools.extension import Extension
+from setuptools.command.develop import develop
 from Cython.Build import cythonize
+
+readcounter = Extension("readcounter",
+        sources=["combinatorialprofiler/readcounter/readcounter.pyx", "combinatorialprofiler/readcounter/cReadCounter.cpp"],
+        language="c++",
+        extra_compile_args=["-std=c++14"],
+        extra_link_args=["-std=c++14"]
+    )
+
+debug = False
+
+class debugmode(develop):
+    def __init__(self, dist, **kw):
+        super().__init__(dist, **kw)
+        debug=True
+        readcounter.extra_compile_args.append("-O0")
+
 
 setup(name='CombinatorialProfiler',
     packages=['combinatorialprofiler'],
@@ -12,9 +29,8 @@ setup(name='CombinatorialProfiler',
     package_data={
         '': ['*.ui']
     },
-    ext_modules = cythonize(Extension("readcounter",
-        sources=["combinatorialprofiler/readcounter/readcounter.pyx", "combinatorialprofiler/readcounter/cReadCounter.cpp"],
-        language="c++",
-        extra_compile_args=["-std=c++14", "-O0"],
-        extra_link_args=["-std=c++14"]
-    ), gdb_debug=True))
+    ext_modules = cythonize(readcounter, gdb_debug=debug),
+    cmdclass={
+        'develop': debugmode
+    }
+)
