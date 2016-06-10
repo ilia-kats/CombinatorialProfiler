@@ -1,3 +1,10 @@
+import sys
+if sys.version < '3.5':
+  print('Unsupported Python version: {0:s}.'.format(sys.version))
+  print('Supported Python versions are 3.5 or a later 3.x version.')
+  sys.exit(1)
+
+
 from setuptools import setup
 from setuptools.extension import Extension
 from setuptools.command.develop import develop
