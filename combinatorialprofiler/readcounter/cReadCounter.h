@@ -45,7 +45,7 @@ class Node;
 class ReadCounter
 {
 public:
-    ReadCounter(std::vector<Experiment*>);
+    ReadCounter(std::vector<Experiment*>, uint16_t insert_mismatches = 1);
     ~ReadCounter();
 
     void countReads(const std::string&, const std::string&, int threads=1);

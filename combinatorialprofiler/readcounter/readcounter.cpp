@@ -1095,6 +1095,7 @@ static const char __pyx_k_ValueError[] = "ValueError";
 static const char __pyx_k_barcode_fw[] = "barcode_fw";
 static const char __pyx_k_categories[] = "categories";
 static const char __pyx_k_experiment[] = "experiment";
+static const char __pyx_k_mismatches[] = "mismatches";
 static const char __pyx_k_Categorical[] = "Categorical";
 static const char __pyx_k_OrderedDict[] = "OrderedDict";
 static const char __pyx_k_barcode_rev[] = "barcode_rev";
@@ -1173,6 +1174,7 @@ static PyObject *__pyx_n_s_items;
 static PyObject *__pyx_n_s_main;
 static PyObject *__pyx_n_s_members;
 static PyObject *__pyx_n_s_metaclass;
+static PyObject *__pyx_n_s_mismatches;
 static PyObject *__pyx_n_s_module;
 static PyObject *__pyx_n_s_name;
 static PyObject *__pyx_n_s_name_2;
@@ -1229,7 +1231,7 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_13named_inserts___get__(s
 static PyObject *__pyx_pf_11readcounter_12PyExperiment_4ndsi___get__(struct __pyx_obj_11readcounter_PyExperiment *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_11readcounter_12PyExperiment_12sorted_cells___get__(struct __pyx_obj_11readcounter_PyExperiment *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_11readcounter_12PyExperiment_6counts___get__(struct __pyx_obj_11readcounter_PyExperiment *__pyx_v_self); /* proto */
-static int __pyx_pf_11readcounter_13PyReadCounter___cinit__(struct __pyx_obj_11readcounter_PyReadCounter *__pyx_v_self, PyObject *__pyx_v_experiments); /* proto */
+static int __pyx_pf_11readcounter_13PyReadCounter___cinit__(struct __pyx_obj_11readcounter_PyReadCounter *__pyx_v_self, PyObject *__pyx_v_experiments, int __pyx_v_mismatches); /* proto */
 static void __pyx_pf_11readcounter_13PyReadCounter_2__dealloc__(struct __pyx_obj_11readcounter_PyReadCounter *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_11readcounter_13PyReadCounter_4countReads(struct __pyx_obj_11readcounter_PyReadCounter *__pyx_v_self, PyObject *__pyx_v_fpath, PyObject *__pyx_v_unmatchedpattern, PyObject *__pyx_v_threads); /* proto */
 static PyObject *__pyx_pf_11readcounter_13PyReadCounter_4read___get__(struct __pyx_obj_11readcounter_PyReadCounter *__pyx_v_self); /* proto */
@@ -4891,7 +4893,7 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_6counts___get__(struct __
 /* "readcounter.pyx":194
  *     cdef list _exprmnts
  * 
- *     def __cinit__(self, list experiments):             # <<<<<<<<<<<<<<
+ *     def __cinit__(self, list experiments, int mismatches=1):             # <<<<<<<<<<<<<<
  *         cdef vector[Experiment*] vec
  *         cdef PyExperiment exp;
  */
@@ -4900,16 +4902,18 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_6counts___get__(struct __
 static int __pyx_pw_11readcounter_13PyReadCounter_1__cinit__(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
 static int __pyx_pw_11readcounter_13PyReadCounter_1__cinit__(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_experiments = 0;
+  int __pyx_v_mismatches;
   int __pyx_r;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__cinit__ (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_experiments,0};
-    PyObject* values[1] = {0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_experiments,&__pyx_n_s_mismatches,0};
+    PyObject* values[2] = {0,0};
     if (unlikely(__pyx_kwds)) {
       Py_ssize_t kw_args;
       const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
       switch (pos_args) {
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
         case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
@@ -4919,27 +4923,40 @@ static int __pyx_pw_11readcounter_13PyReadCounter_1__cinit__(PyObject *__pyx_v_s
         case  0:
         if (likely((values[0] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_experiments)) != 0)) kw_args--;
         else goto __pyx_L5_argtuple_error;
+        case  1:
+        if (kw_args > 0) {
+          PyObject* value = PyDict_GetItem(__pyx_kwds, __pyx_n_s_mismatches);
+          if (value) { values[1] = value; kw_args--; }
+        }
       }
       if (unlikely(kw_args > 0)) {
         if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "__cinit__") < 0)) __PYX_ERR(0, 194, __pyx_L3_error)
       }
-    } else if (PyTuple_GET_SIZE(__pyx_args) != 1) {
-      goto __pyx_L5_argtuple_error;
     } else {
-      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      switch (PyTuple_GET_SIZE(__pyx_args)) {
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        break;
+        default: goto __pyx_L5_argtuple_error;
+      }
     }
     __pyx_v_experiments = ((PyObject*)values[0]);
+    if (values[1]) {
+      __pyx_v_mismatches = __Pyx_PyInt_As_int(values[1]); if (unlikely((__pyx_v_mismatches == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 194, __pyx_L3_error)
+    } else {
+      __pyx_v_mismatches = ((int)1);
+    }
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("__cinit__", 1, 1, 1, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 194, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("__cinit__", 0, 1, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 194, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("readcounter.PyReadCounter.__cinit__", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return -1;
   __pyx_L4_argument_unpacking_done:;
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_experiments), (&PyList_Type), 1, "experiments", 1))) __PYX_ERR(0, 194, __pyx_L1_error)
-  __pyx_r = __pyx_pf_11readcounter_13PyReadCounter___cinit__(((struct __pyx_obj_11readcounter_PyReadCounter *)__pyx_v_self), __pyx_v_experiments);
+  __pyx_r = __pyx_pf_11readcounter_13PyReadCounter___cinit__(((struct __pyx_obj_11readcounter_PyReadCounter *)__pyx_v_self), __pyx_v_experiments, __pyx_v_mismatches);
 
   /* function exit code */
   goto __pyx_L0;
@@ -4950,7 +4967,7 @@ static int __pyx_pw_11readcounter_13PyReadCounter_1__cinit__(PyObject *__pyx_v_s
   return __pyx_r;
 }
 
-static int __pyx_pf_11readcounter_13PyReadCounter___cinit__(struct __pyx_obj_11readcounter_PyReadCounter *__pyx_v_self, PyObject *__pyx_v_experiments) {
+static int __pyx_pf_11readcounter_13PyReadCounter___cinit__(struct __pyx_obj_11readcounter_PyReadCounter *__pyx_v_self, PyObject *__pyx_v_experiments, int __pyx_v_mismatches) {
   std::vector<Experiment *>  __pyx_v_vec;
   struct __pyx_obj_11readcounter_PyExperiment *__pyx_v_exp = 0;
   int __pyx_r;
@@ -4979,7 +4996,7 @@ static int __pyx_pf_11readcounter_13PyReadCounter___cinit__(struct __pyx_obj_11r
  *         self._exprmnts = experiments
  *         for exp in self._exprmnts:             # <<<<<<<<<<<<<<
  *             vec.push_back((<PyExperiment>exp)._exprmnt)
- *         self._rdcntr = new ReadCounter(vec)
+ *         self._rdcntr = new ReadCounter(vec, mismatches)
  */
   if (unlikely(__pyx_v_self->_exprmnts == Py_None)) {
     PyErr_SetString(PyExc_TypeError, "'NoneType' object is not iterable");
@@ -5002,7 +5019,7 @@ static int __pyx_pf_11readcounter_13PyReadCounter___cinit__(struct __pyx_obj_11r
  *         self._exprmnts = experiments
  *         for exp in self._exprmnts:
  *             vec.push_back((<PyExperiment>exp)._exprmnt)             # <<<<<<<<<<<<<<
- *         self._rdcntr = new ReadCounter(vec)
+ *         self._rdcntr = new ReadCounter(vec, mismatches)
  * 
  */
     try {
@@ -5017,7 +5034,7 @@ static int __pyx_pf_11readcounter_13PyReadCounter___cinit__(struct __pyx_obj_11r
  *         self._exprmnts = experiments
  *         for exp in self._exprmnts:             # <<<<<<<<<<<<<<
  *             vec.push_back((<PyExperiment>exp)._exprmnt)
- *         self._rdcntr = new ReadCounter(vec)
+ *         self._rdcntr = new ReadCounter(vec, mismatches)
  */
   }
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
@@ -5025,12 +5042,12 @@ static int __pyx_pf_11readcounter_13PyReadCounter___cinit__(struct __pyx_obj_11r
   /* "readcounter.pyx":200
  *         for exp in self._exprmnts:
  *             vec.push_back((<PyExperiment>exp)._exprmnt)
- *         self._rdcntr = new ReadCounter(vec)             # <<<<<<<<<<<<<<
+ *         self._rdcntr = new ReadCounter(vec, mismatches)             # <<<<<<<<<<<<<<
  * 
  *     def __dealloc__(self):
  */
   try {
-    __pyx_t_4 = new ReadCounter(__pyx_v_vec);
+    __pyx_t_4 = new ReadCounter(__pyx_v_vec, __pyx_v_mismatches);
   } catch(...) {
     __Pyx_CppExn2PyErr();
     __PYX_ERR(0, 200, __pyx_L1_error)
@@ -5040,7 +5057,7 @@ static int __pyx_pf_11readcounter_13PyReadCounter___cinit__(struct __pyx_obj_11r
   /* "readcounter.pyx":194
  *     cdef list _exprmnts
  * 
- *     def __cinit__(self, list experiments):             # <<<<<<<<<<<<<<
+ *     def __cinit__(self, list experiments, int mismatches=1):             # <<<<<<<<<<<<<<
  *         cdef vector[Experiment*] vec
  *         cdef PyExperiment exp;
  */
@@ -5060,7 +5077,7 @@ static int __pyx_pf_11readcounter_13PyReadCounter___cinit__(struct __pyx_obj_11r
 }
 
 /* "readcounter.pyx":202
- *         self._rdcntr = new ReadCounter(vec)
+ *         self._rdcntr = new ReadCounter(vec, mismatches)
  * 
  *     def __dealloc__(self):             # <<<<<<<<<<<<<<
  *         del self._rdcntr
@@ -5092,7 +5109,7 @@ static void __pyx_pf_11readcounter_13PyReadCounter_2__dealloc__(struct __pyx_obj
   delete __pyx_v_self->_rdcntr;
 
   /* "readcounter.pyx":202
- *         self._rdcntr = new ReadCounter(vec)
+ *         self._rdcntr = new ReadCounter(vec, mismatches)
  * 
  *     def __dealloc__(self):             # <<<<<<<<<<<<<<
  *         del self._rdcntr
@@ -8293,6 +8310,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_main, __pyx_k_main, sizeof(__pyx_k_main), 0, 0, 1, 1},
   {&__pyx_n_s_members, __pyx_k_members, sizeof(__pyx_k_members), 0, 0, 1, 1},
   {&__pyx_n_s_metaclass, __pyx_k_metaclass, sizeof(__pyx_k_metaclass), 0, 0, 1, 1},
+  {&__pyx_n_s_mismatches, __pyx_k_mismatches, sizeof(__pyx_k_mismatches), 0, 0, 1, 1},
   {&__pyx_n_s_module, __pyx_k_module, sizeof(__pyx_k_module), 0, 0, 1, 1},
   {&__pyx_n_s_name, __pyx_k_name, sizeof(__pyx_k_name), 0, 0, 1, 1},
   {&__pyx_n_s_name_2, __pyx_k_name_2, sizeof(__pyx_k_name_2), 0, 0, 1, 1},
@@ -10931,6 +10949,28 @@ bad:
     Py_XDECREF(py_frame);
 }
 
+/* CIntFromPyVerify */
+            #define __PYX_VERIFY_RETURN_INT(target_type, func_type, func_value)\
+    __PYX__VERIFY_RETURN_INT(target_type, func_type, func_value, 0)
+#define __PYX_VERIFY_RETURN_INT_EXC(target_type, func_type, func_value)\
+    __PYX__VERIFY_RETURN_INT(target_type, func_type, func_value, 1)
+#define __PYX__VERIFY_RETURN_INT(target_type, func_type, func_value, exc)\
+    {\
+        func_type value = func_value;\
+        if (sizeof(target_type) < sizeof(func_type)) {\
+            if (unlikely(value != (func_type) (target_type) value)) {\
+                func_type zero = 0;\
+                if (exc && unlikely(value == (func_type)-1 && PyErr_Occurred()))\
+                    return (target_type) -1;\
+                if (is_unsigned && unlikely(value < zero))\
+                    goto raise_neg_overflow;\
+                else\
+                    goto raise_overflow;\
+            }\
+        }\
+        return (target_type) value;\
+    }
+
 /* CIntToPy */
             static CYTHON_INLINE PyObject* __Pyx_PyInt_From_long(long value) {
     const long neg_one = (long) -1, const_zero = (long) 0;
@@ -11011,28 +11051,6 @@ bad:
                                      little, !is_unsigned);
     }
 }
-
-/* CIntFromPyVerify */
-            #define __PYX_VERIFY_RETURN_INT(target_type, func_type, func_value)\
-    __PYX__VERIFY_RETURN_INT(target_type, func_type, func_value, 0)
-#define __PYX_VERIFY_RETURN_INT_EXC(target_type, func_type, func_value)\
-    __PYX__VERIFY_RETURN_INT(target_type, func_type, func_value, 1)
-#define __PYX__VERIFY_RETURN_INT(target_type, func_type, func_value, exc)\
-    {\
-        func_type value = func_value;\
-        if (sizeof(target_type) < sizeof(func_type)) {\
-            if (unlikely(value != (func_type) (target_type) value)) {\
-                func_type zero = 0;\
-                if (exc && unlikely(value == (func_type)-1 && PyErr_Occurred()))\
-                    return (target_type) -1;\
-                if (is_unsigned && unlikely(value < zero))\
-                    goto raise_neg_overflow;\
-                else\
-                    goto raise_overflow;\
-            }\
-        }\
-        return (target_type) value;\
-    }
 
 /* CIntFromPy */
             static CYTHON_INLINE int __Pyx_PyInt_As_int(PyObject *x) {

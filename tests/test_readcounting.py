@@ -244,7 +244,7 @@ def test_unmatchable_barcodes(tmpdir):
                 del cc[codes]
 
     exps = [PyExperiment(str(i), {'insert': iseq, 'barcodes_fw': make_barcodes_dict(fwcodes), 'barcodes_rev': make_barcodes_dict(revcodes)}) for i, iseq in enumerate(fq.inserts)]
-    counter = PyReadCounter(exps)
+    counter = PyReadCounter(exps, 0)
     unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
     counter.countReads(str(fq.file), str(unmatched), 4)
     assert counter.read == fq.totalreads
