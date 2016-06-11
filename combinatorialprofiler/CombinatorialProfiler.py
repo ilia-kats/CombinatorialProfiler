@@ -20,6 +20,7 @@ import Bio.Seq
 import Bio.Alphabet
 
 from .readcounter import PyReadCounter, PyExperiment, NDSIS
+from . import version
 
 def dict_merge(dicts):
     dct = dicts.pop()
@@ -298,6 +299,7 @@ def main():
     parser.add_argument('-c', '--configuration', required=True, help='JSON configuration file.')
     parser.add_argument('-r', '--resume', required=False, action='store_true', help='Resume aborted run? If intermediate files are found, they will be reused instead.')
     parser.add_argument('-l', '--log-level', required=False, default='INFO', choices=['ERROR', 'WARNING', 'INFO', 'DEBUG'])
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + version, help='Print version and exit')
     args = parser.parse_args()
 
     os.makedirs(args.outdir, exist_ok=True)

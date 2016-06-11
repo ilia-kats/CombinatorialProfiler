@@ -9,6 +9,8 @@ from setuptools import setup
 from setuptools.extension import Extension
 from setuptools.command.develop import develop
 
+from combinatorialprofiler import version
+
 readcounter = Extension("combinatorialprofiler.readcounter",
         sources=["combinatorialprofiler/readcounter/readcounter.cpp", "combinatorialprofiler/readcounter/cReadCounter.cpp"],
         language="c++",
@@ -46,4 +48,10 @@ setup(name='CombinatorialProfiler',
     zip_safe = True,
     setup_requires=['pytest-runner'],
     tests_require=['pytest'],
+
+    version=version,
+    description='Pipeline for analysis of combinatorial stability profiling data',
+    author="Ilia Kats",
+    author_email="i.kats@zmbh.uni-heidelberg.de",
+    licence="GPLv2"
 )
