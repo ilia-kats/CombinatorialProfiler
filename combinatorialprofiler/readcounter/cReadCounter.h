@@ -50,6 +50,8 @@ public:
 
     void countReads(const std::string&, const std::string&, int threads=1);
 
+    uint16_t allowedMismatches() const;
+
     uint64_t read() const;
     uint64_t counted() const;
     uint64_t unmatchedTotal() const;
@@ -63,6 +65,8 @@ public:
 
 private:
     struct ThreadSynchronization;
+
+    uint16_t m_allowedMismatches;
 
     uint64_t m_read;
     uint64_t m_counted;

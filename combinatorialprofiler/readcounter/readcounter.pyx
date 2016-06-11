@@ -44,6 +44,7 @@ cdef extern from "cReadCounter.h" nogil:
     cdef cppclass ReadCounter:
         ReadCounter(vector[Experiment*], uint16_t mismatches) except+
         void countReads(const string&, const string&, int)
+        uint16_t allowedMismatches()
         uint64_t read()
         uint64_t unmatchedTotal()
         uint64_t unmatchedInsert()
@@ -207,6 +208,10 @@ cdef class PyReadCounter:
         assert self.read == self.counted + self.unmatched_total
         assert self.unmatched_total == self.unmatched_insert + self.unmatched_barcodes + self.unmatched_insert_sequence
         assert self.unmatched_total == self.written
+
+    @property
+    def allowed_mismatches(self):
+        return self._rdcntr.allowedMismatches()
 
     @property
     def read(self):

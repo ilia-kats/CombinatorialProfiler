@@ -68,7 +68,7 @@ class FastQCreator:
 def make_barcodes_dict(codes):
     return {str(i): c for i,c in enumerate(codes)}
 
-def test_simplecounts(tmpdir):
+def simplecounts(tmpdir, mismatches):
     fq = FastQCreator(tmpdir)
     exps = []
     for i in enumerate(fq.inserts):
@@ -77,7 +77,7 @@ def test_simplecounts(tmpdir):
         d['barcodes_fw'] = make_barcodes_dict(fq.fwcodes)
         d['barcodes_rev'] = make_barcodes_dict(fq.revcodes)
         exps.append(PyExperiment(str(i[0]), d))
-    counter = PyReadCounter(exps)
+    counter = PyReadCounter(exps, mismatches)
 
     unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
     counter.countReads(str(fq.file), str(unmatched), 4)
@@ -86,6 +86,13 @@ def test_simplecounts(tmpdir):
     assert counter.counted == fq.totalreads
     for val, truth in zip(exps, fq.varcounts):
         assert val.counts == truth
+    assert counter.allowed_mismatches == mismatches
+
+def test_simplecounts(tmpdir):
+    simplecounts(tmpdir, 1)
+
+def test_simplecounts_nomismatches(tmpdir):
+    simplecounts(tmpdir, 0)
 
 def test_namedinserts(tmpdir):
     fq = FastQCreator(tmpdir, ninserts=1)
@@ -117,6 +124,7 @@ def test_namedinserts(tmpdir):
     assert counter.unmatched_insert_sequence == unmatched
     assert counter.unmatched_total == counter.unmatched_insert_sequence
     assert exp.counts == ncounts
+    assert counter.allowed_mismatches == 1
 
 def test_no_reverse_codes(tmpdir):
     fq = FastQCreator(tmpdir, ninserts=2)
@@ -144,6 +152,7 @@ def test_no_reverse_codes(tmpdir):
     assert counter.counted == fq.totalreads
     for val, truth in zip(exps, counts):
         assert val.counts == truth, "Counts don't match with expected values for experiment %s" % val.name
+    assert counter.allowed_mismatches == 1
 
 def test_no_forward_codes(tmpdir):
     fq = FastQCreator(tmpdir, ninserts=2)
@@ -171,6 +180,7 @@ def test_no_forward_codes(tmpdir):
     assert counter.counted == fq.totalreads
     for val, truth in zip(exps, counts):
         assert val.counts == truth, "Counts don't match with expected values for experiment %s" % val.name
+    assert counter.allowed_mismatches == 1
 
 def test_no_forward_and_reverse_codes(tmpdir):
     fq = FastQCreator(tmpdir, ninserts=2)
@@ -209,6 +219,7 @@ def test_no_forward_and_reverse_codes(tmpdir):
     assert counter.counted == fq.totalreads
     for val, truth in zip(exps, counts):
         assert val.counts == truth, "Counts don't match with expected values for experiment %s" % val.name
+    assert counter.allowed_mismatches == 1
 
 def test_unmatchable_inserts(tmpdir):
     fq = FastQCreator(tmpdir, ninserts=3)
@@ -229,6 +240,7 @@ def test_unmatchable_inserts(tmpdir):
 
     for val, truth in zip(exps, fq.varcounts[:-1]):
         assert val.counts == truth
+    assert counter.allowed_mismatches == 1
 
 def test_unmatchable_barcodes(tmpdir):
     fq = FastQCreator(tmpdir, ninserts=2)
@@ -244,7 +256,7 @@ def test_unmatchable_barcodes(tmpdir):
                 del cc[codes]
 
     exps = [PyExperiment(str(i), {'insert': iseq, 'barcodes_fw': make_barcodes_dict(fwcodes), 'barcodes_rev': make_barcodes_dict(revcodes)}) for i, iseq in enumerate(fq.inserts)]
-    counter = PyReadCounter(exps, 0)
+    counter = PyReadCounter(exps)
     unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
     counter.countReads(str(fq.file), str(unmatched), 4)
     assert counter.read == fq.totalreads
@@ -253,3 +265,4 @@ def test_unmatchable_barcodes(tmpdir):
 
     for val, truth in zip(exps, counts):
         assert val.counts == truth
+    assert counter.allowed_mismatches == 1

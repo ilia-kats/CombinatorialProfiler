@@ -304,7 +304,7 @@ UniqueBarcodes makeUnique(const std::unordered_set<std::string> &codes)
 }
 
 ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_mismatches)
-: m_read(0), m_counted(0), m_unmatchedTotal(0), m_unmatchedInsert(0), m_unmatchedBarcodes(0), m_unmatchedInsertSequence(0), m_written(0), m_experiments(experiments)
+: m_allowedMismatches(insert_mismatches), m_read(0), m_counted(0), m_unmatchedTotal(0), m_unmatchedInsert(0), m_unmatchedBarcodes(0), m_unmatchedInsertSequence(0), m_written(0), m_experiments(experiments)
 {
     std::unordered_set<std::string> fwCodes;
     std::unordered_set<std::string> revCodes;
@@ -312,7 +312,7 @@ ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_m
     std::unordered_map<std::string, InsertNode*> inserts;
     for (const auto &exp : m_experiments) {
         if (!inserts.count(exp->insert)) {
-            InsertNode *n = new InsertNode(exp->insert, insert_mismatches);
+            InsertNode *n = new InsertNode(exp->insert, m_allowedMismatches);
             inserts[exp->insert] = n;
             m_nodes.push_back(n);
             m_tree.push_back(n);
@@ -432,6 +432,11 @@ void ReadCounter::countReads(const std::string &file, const std::string &outpref
     assert(m_read == m_counted + m_unmatchedTotal);
     assert(m_unmatchedTotal = m_unmatchedInsert + m_unmatchedBarcodes + m_unmatchedInsertSequence);
     assert(m_unmatchedTotal == m_written);
+}
+
+uint16_t ReadCounter::allowedMismatches() const
+{
+    return m_allowedMismatches;
 }
 
 uint64_t ReadCounter::read() const
