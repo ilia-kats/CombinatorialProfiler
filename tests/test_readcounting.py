@@ -18,7 +18,7 @@ class FastQCreator:
         return seq.translate(cls.ttable)[::-1]
 
     def __init__(self, tmpdir, ninserts=2):
-        self.totalreads = random.randint(1000, 10000)
+        self.totalreads = random.randint(1000, 20000)
         self.fwcodes = set()
         self.revcodes = set()
         self.inserts = set()
@@ -209,3 +209,47 @@ def test_no_forward_and_reverse_codes(tmpdir):
     assert counter.counted == fq.totalreads
     for val, truth in zip(exps, counts):
         assert val.counts == truth, "Counts don't match with expected values for experiment %s" % val.name
+
+def test_unmatchable_inserts(tmpdir):
+    fq = FastQCreator(tmpdir, ninserts=3)
+    nunmatched = 0
+    for c,i in fq.varcounts[-1].items():
+        for ins, c in i.items():
+            nunmatched += c
+
+    exps = [PyExperiment(str(i), {'insert': iseq, 'barcodes_fw': make_barcodes_dict(fq.fwcodes), 'barcodes_rev': make_barcodes_dict(fq.revcodes)}) for i, iseq in enumerate(fq.inserts[:-1])]
+    counter = PyReadCounter(exps)
+
+    unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
+    counter.countReads(str(fq.file), str(unmatched), 4)
+    assert counter.read == fq.totalreads
+    assert counter.unmatched_insert == nunmatched
+    assert counter.unmatched_insert == counter.unmatched_total
+    assert counter.counted == counter.read - nunmatched
+
+    for val, truth in zip(exps, fq.varcounts[:-1]):
+        assert val.counts == truth
+
+def test_unmatchable_barcodes(tmpdir):
+    fq = FastQCreator(tmpdir, ninserts=2)
+    nunmatched = 0
+    fwcodes = set(random.sample(fq.fwcodes, int(0.8 * len(fq.fwcodes))))
+    revcodes = set(random.sample(fq.fwcodes, int(0.8 * len(fq.revcodes))))
+    counts = fq.varcounts
+    for cc in counts:
+        for codes in list(cc.keys()):
+            if codes[0] not in fwcodes or codes[1] not in revcodes:
+                for i, c in cc[codes].items():
+                    nunmatched += c
+                del cc[codes]
+
+    exps = [PyExperiment(str(i), {'insert': iseq, 'barcodes_fw': make_barcodes_dict(fwcodes), 'barcodes_rev': make_barcodes_dict(revcodes)}) for i, iseq in enumerate(fq.inserts)]
+    counter = PyReadCounter(exps)
+    unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
+    counter.countReads(str(fq.file), str(unmatched), 4)
+    assert counter.read == fq.totalreads
+    assert counter.unmatched_barcodes == nunmatched
+    assert counter.counted == counter.read - nunmatched
+
+    for val, truth in zip(exps, counts):
+        assert val.counts == truth

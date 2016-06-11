@@ -53,5 +53,5 @@ setup(name='CombinatorialProfiler',
     description='Pipeline for analysis of combinatorial stability profiling data',
     author="Ilia Kats",
     author_email="i.kats@zmbh.uni-heidelberg.de",
-    licence="GPLv2"
+    license="GPLv2"
 )
