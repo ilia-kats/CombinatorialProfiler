@@ -53,8 +53,8 @@ cdef extern from "cReadCounter.h" nogil:
         uint64_t counted()
         uint64_t written()
 
-        UniqueBarcodes uniqueForwardBarcodes()
-        UniqueBarcodes uniqueReverseBarcodes()
+        unordered_map[string, UniqueBarcodes] uniqueForwardBarcodes()
+        unordered_map[string, UniqueBarcodes] uniqueReverseBarcodes()
 
 cdef class PyExperiment:
     cdef Experiment *_exprmnt

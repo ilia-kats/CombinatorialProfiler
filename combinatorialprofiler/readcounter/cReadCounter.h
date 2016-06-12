@@ -60,8 +60,8 @@ public:
     uint64_t unmatchedInsertSequence() const;
     uint64_t written() const;
 
-    UniqueBarcodes uniqueForwardBarcodes() const;
-    UniqueBarcodes uniqueReverseBarcodes() const;
+    std::unordered_map<std::string, UniqueBarcodes> uniqueForwardBarcodes() const;
+    std::unordered_map<std::string, UniqueBarcodes> uniqueReverseBarcodes() const;
 
 private:
     struct ThreadSynchronization;
@@ -80,8 +80,8 @@ private:
 
     std::vector<InsertNode*> m_tree;
     std::vector<Node*> m_nodes;
-    UniqueBarcodes m_uniqueFwCodes;
-    UniqueBarcodes m_uniqueRevCodes;
+    std::unordered_map<std::string, UniqueBarcodes> m_uniqueFwCodes;
+    std::unordered_map<std::string, UniqueBarcodes> m_uniqueRevCodes;
 
     void readFile(const std::string&, ThreadSynchronization*);
     void matchRead(ThreadSynchronization*);

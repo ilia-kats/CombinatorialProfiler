@@ -249,18 +249,32 @@ public:
     bool match(Read &read, std::string *insert=nullptr) const
     {
         decltype(m_upstreamseq)::size_type start, end;
-        auto upstream = fuzzy_find(m_upstreamseq, read.getSequence());
-        if (upstream.second > m_mismatches) {
-            read = read.reverseComplement();
-            upstream = fuzzy_find(m_upstreamseq, read.getSequence());
-            if (upstream.second > m_mismatches)
+        if (m_mismatches > 0) {
+            auto upstream = fuzzy_find(m_upstreamseq, read.getSequence());
+            if (upstream.second > m_mismatches) {
+                read = read.reverseComplement();
+                upstream = fuzzy_find(m_upstreamseq, read.getSequence());
+                if (upstream.second > m_mismatches)
+                    return false;
+            }
+            auto downstream = fuzzy_find(m_downstreamseq, read.getSequence());
+            if (downstream.second + upstream.second > m_mismatches)
                 return false;
+            start = upstream.first + m_upstreamseq.size();
+            end = downstream.first;
+        } else {
+            start = read.getSequence().find(m_upstreamseq);
+            if (start == decltype(m_upstreamseq)::npos) {
+                read = read.reverseComplement();
+                start = read.getSequence().find(m_upstreamseq);
+                if (start == decltype(m_upstreamseq)::npos)
+                    return false;
+            }
+            end = read.getSequence().find(m_downstreamseq);
+            if (end == decltype(m_downstreamseq)::npos)
+                return false;
+            start += m_upstreamseq.size();
         }
-        auto downstream = fuzzy_find(m_downstreamseq, read.getSequence());
-        if (downstream.second + upstream.second > m_mismatches)
-            return false;
-        start = upstream.first + m_upstreamseq.size();
-        end = downstream.first;
 
         if (end - start != m_insertlength)
             return false;
@@ -286,6 +300,7 @@ UniqueBarcodes makeUnique(const std::unordered_set<std::string> &codes)
     for (const auto &c : codes) {
         std::vector<std::string> u;
         u.push_back(c);
+        // TODO: add parameter for minimum barcode length, expose to Python
         for (std::remove_reference<decltype(c)>::type::size_type i = 1; i < c.size(); ++i) {
             bool found = false;
             for (const auto &cc : codes) {
@@ -305,8 +320,8 @@ UniqueBarcodes makeUnique(const std::unordered_set<std::string> &codes)
 ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_mismatches)
 : m_allowedMismatches(insert_mismatches), m_read(0), m_counted(0), m_unmatchedTotal(0), m_unmatchedInsert(0), m_unmatchedBarcodes(0), m_unmatchedInsertSequence(0), m_written(0), m_experiments(experiments)
 {
-    std::unordered_set<std::string> fwCodes;
-    std::unordered_set<std::string> revCodes;
+    std::unordered_map<std::string, std::unordered_set<std::string>> fwCodes;
+    std::unordered_map<std::string, std::unordered_set<std::string>> revCodes;
 
     std::unordered_map<std::string, InsertNode*> inserts;
     for (const auto &exp : m_experiments) {
@@ -317,13 +332,17 @@ ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_m
             m_tree.push_back(n);
         }
         for (const auto &c : exp->fwBarcodeSet)
-            fwCodes.insert(c.first);
+            fwCodes[exp->insert].insert(c.first);
         for (const auto &c : exp->revBarcodeSet)
-            revCodes.insert(c.first);
+            revCodes[exp->insert].insert(c.first);
     }
 
-    m_uniqueFwCodes = makeUnique(fwCodes);
-    m_uniqueRevCodes = makeUnique(revCodes);
+    for (const auto &c : fwCodes) {
+        m_uniqueFwCodes[c.first] = makeUnique(c.second);
+    }
+    for (const auto &c : revCodes) {
+        m_uniqueRevCodes[c.first] = makeUnique(c.second);
+    }
 
     std::unordered_map<std::string, std::unordered_map<std::string, BarcodeNode*>> fwNodes;
     std::unordered_map<std::string,BarcodeNode*> dummyNodes;
@@ -331,7 +350,7 @@ ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_m
     for (const auto &exp : m_experiments) {
         std::vector<BarcodeNode*> revNodes;
         for (const auto &c : exp->revBarcodeSet) {
-            BarcodeNode *n = new RevBarcodeNode(c.first, m_uniqueRevCodes[c.first]);
+            BarcodeNode *n = new RevBarcodeNode(c.first, m_uniqueRevCodes[exp->insert][c.first]);
             n->experiment = exp;
             revNodes.push_back(n);
             m_nodes.push_back(n);
@@ -339,7 +358,7 @@ ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_m
 
         for (const auto &c : exp->fwBarcodeSet) {
             if (!fwNodes[exp->insert].count(c.first)) {
-                BarcodeNode *n = new FwBarcodeNode(c.first, m_uniqueFwCodes[c.first]);
+                BarcodeNode *n = new FwBarcodeNode(c.first, m_uniqueFwCodes[exp->insert][c.first]);
                 fwNodes[exp->insert][c.first] = n;
                 m_nodes.push_back(n);
                 inserts[exp->insert]->children.push_back(n);
@@ -473,12 +492,12 @@ uint64_t ReadCounter::written() const
     return m_written;
 }
 
-UniqueBarcodes ReadCounter::uniqueForwardBarcodes() const
+std::unordered_map<std::string, UniqueBarcodes> ReadCounter::uniqueForwardBarcodes() const
 {
     return m_uniqueFwCodes;
 }
 
-UniqueBarcodes ReadCounter::uniqueReverseBarcodes() const
+std::unordered_map<std::string, UniqueBarcodes> ReadCounter::uniqueReverseBarcodes() const
 {
     return m_uniqueRevCodes;
 }

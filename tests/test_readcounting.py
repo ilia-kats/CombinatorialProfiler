@@ -18,7 +18,7 @@ class FastQCreator:
         return seq.translate(cls.ttable)[::-1]
 
     def __init__(self, tmpdir, ninserts=2):
-        self.totalreads = random.randint(10000, 100000)
+        self.totalreads = random.randint(10000, 20000)
         self.fwcodes = set()
         self.revcodes = set()
         self.inserts = set()
@@ -128,16 +128,9 @@ def test_namedinserts(tmpdir):
 
 def test_no_reverse_codes(tmpdir):
     fq = FastQCreator(tmpdir, ninserts=2)
-    counts = fq.varcounts
-    counts.append({})
+    fq.varcounts.append({})
     revcodes_tokeep = {str(i) : fq.revcodes[i] for i in random.sample(range(len(fq.revcodes)), int(0.7 * len(fq.revcodes)))}
-    for codes in list(counts[-2].keys()):
-        if codes[1] not in revcodes_tokeep:
-            nkey = (codes[0], '')
-            ndict = counts[-1].setdefault(nkey, {})
-            for i, c in counts[-2][codes].items():
-                ndict[i] = ndict.get(i, 0) + c
-            del counts[-2][codes]
+    revcodes_toremove = {str(i) : fq.revcodes[i] for i in range(len(fq.revcodes)) if str(i) not in revcodes_tokeep}
     fwcodes = make_barcodes_dict(fq.fwcodes)
     exps = [
         PyExperiment("fullset", {'insert': fq.inserts[0], 'barcodes_fw':  fwcodes, 'barcodes_rev': make_barcodes_dict(fq.revcodes)}),
@@ -146,26 +139,42 @@ def test_no_reverse_codes(tmpdir):
     ]
     counter = PyReadCounter(exps)
 
+    for codes in list(fq.varcounts[-2].keys()):
+        if codes[1] in revcodes_toremove:
+            revcode = None
+            for c, u in counter.unique_reverse_barcodes[fq.inserts[-1]].items():
+                for uc in u:
+                    if revcodes_toremove[codes[1]].startswith(uc):
+                        revcode = c
+                        break
+                if revcode:
+                    for i, c in revcodes_tokeep.items():
+                        if c == revcode:
+                            revcode = i
+                            break
+                    break
+            if revcode:
+                ndict = fq.varcounts[-2].setdefault((codes[0], revcode), {})
+            else:
+                ndict = fq.varcounts[-1].setdefault((codes[0], ''), {})
+            for i, c in fq.varcounts[-2][codes].items():
+                ndict[i] = ndict.get(i, 0) + c
+            del fq.varcounts[-2][codes]
+
     unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
     counter.countReads(str(fq.file), str(unmatched), 4)
     assert counter.read == fq.totalreads
     assert counter.counted == fq.totalreads
-    for val, truth in zip(exps, counts):
+    for val, truth in zip(exps, fq.varcounts):
         assert val.counts == truth, "Counts don't match with expected values for experiment %s" % val.name
     assert counter.allowed_mismatches == 1
 
 def test_no_forward_codes(tmpdir):
     fq = FastQCreator(tmpdir, ninserts=2)
-    counts = fq.varcounts
-    counts.append({})
+    fq.varcounts.append({})
     fwcodes_tokeep = {str(i) : fq.fwcodes[i] for i in random.sample(range(len(fq.fwcodes)), int(0.7 * len(fq.fwcodes)))}
-    for codes in list(counts[-2].keys()):
-        if codes[0] not in fwcodes_tokeep:
-            nkey = ('', codes[1])
-            ndict = counts[-1].setdefault(nkey, {})
-            for i, c in counts[-2][codes].items():
-                ndict[i] = ndict.get(i, 0) + c
-            del counts[-2][codes]
+    fwcodes_toremove = {str(i) : fq.fwcodes[i] for i in range(len(fq.fwcodes)) if str(i) not in fwcodes_tokeep}
+    revcodes = {str(i) : fq.revcodes[i] for i in random.sample(range(len(fq.revcodes)), int(0.8 * len(fq.revcodes)))}
     revcodes = make_barcodes_dict(fq.revcodes)
     exps = [
         PyExperiment("fullset", {'insert': fq.inserts[0], 'barcodes_rev':  revcodes, 'barcodes_fw': make_barcodes_dict(fq.fwcodes)}),
@@ -174,36 +183,45 @@ def test_no_forward_codes(tmpdir):
     ]
     counter = PyReadCounter(exps)
 
+    for codes in list(fq.varcounts[-2].keys()):
+        if codes[0] in fwcodes_toremove:
+            fwcode = None
+            for c, u in counter.unique_forward_barcodes[fq.inserts[-1]].items():
+                for uc in u:
+                    if fwcodes_toremove[codes[0]].startswith(uc):
+                        fwcode = c
+                        break
+                if fwcode:
+                    for i, c in fwcodes_tokeep.items():
+                        if c == fwcode:
+                            fwcode = i
+                            break
+                    break
+            if fwcode:
+                ndict = fq.varcounts[-2].setdefault((fwcode, codes[1]), {})
+            else:
+                ndict = fq.varcounts[-1].setdefault(('', codes[1]), {})
+            for i, c in fq.varcounts[-2][codes].items():
+                ndict[i] = ndict.get(i, 0) + c
+            del fq.varcounts[-2][codes]
+
     unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
     counter.countReads(str(fq.file), str(unmatched), 4)
     assert counter.read == fq.totalreads
     assert counter.counted == fq.totalreads
-    for val, truth in zip(exps, counts):
+    for val, truth in zip(exps, fq.varcounts):
         assert val.counts == truth, "Counts don't match with expected values for experiment %s" % val.name
     assert counter.allowed_mismatches == 1
 
 def test_no_forward_and_reverse_codes(tmpdir):
     fq = FastQCreator(tmpdir, ninserts=2)
     counts = fq.varcounts
-    counts.extend([{}, {}, {}])
+    fq.varcounts.extend([{}, {}, {}])
     fwcodes_tokeep = {str(i) : fq.fwcodes[i] for i in random.sample(range(len(fq.fwcodes)), int(0.7 * len(fq.fwcodes)))}
+    fwcodes_toremove = {str(i) : fq.fwcodes[i] for i in range(len(fq.fwcodes)) if str(i) not in fwcodes_tokeep}
+    revcodes = {str(i) : fq.revcodes[i] for i in random.sample(range(len(fq.revcodes)), int(0.8 * len(fq.revcodes)))}
     revcodes_tokeep = {str(i) : fq.revcodes[i] for i in random.sample(range(len(fq.revcodes)), int(0.7 * len(fq.revcodes)))}
-
-    for codes in list(counts[-4].keys()):
-        ncodes = codes
-        index = -4
-        if ncodes[0] not in fwcodes_tokeep:
-            ncodes = ('', ncodes[1])
-            index += 1
-        if ncodes[1] not in revcodes_tokeep:
-            ncodes = (ncodes[0], '')
-            index += 2
-        if ncodes not in counts[-4]:
-            ndict = counts[index].setdefault(ncodes, {})
-            for i, c in counts[-4][codes].items():
-                ndict[i] = ndict.get(i, 0) + c
-            del counts[-4][codes]
-
+    revcodes_toremove = {str(i): fq.revcodes[i] for i in range(len(fq.revcodes)) if str(i) not in revcodes_tokeep}
     exps = [
         PyExperiment("fullset", {'insert': fq.inserts[0], 'barcodes_fw':  make_barcodes_dict(fq.fwcodes), 'barcodes_rev': make_barcodes_dict(fq.revcodes)}),
         PyExperiment("reduced", {'insert': fq.inserts[1], 'barcodes_fw': fwcodes_tokeep, 'barcodes_rev': revcodes_tokeep}),
@@ -213,11 +231,60 @@ def test_no_forward_and_reverse_codes(tmpdir):
     ]
     counter = PyReadCounter(exps)
 
+    for codes in list(counts[-4].keys()):
+        fwcode = None
+        revcode = None
+        if codes[0] in fwcodes_toremove:
+            for c, u in counter.unique_forward_barcodes[fq.inserts[1]].items():
+                for uc in u:
+                    if fwcodes_toremove[codes[0]].startswith(uc):
+                        fwcode = c
+                        break
+                if fwcode:
+                    for j, c in fwcodes.items():
+                        if c == fwcode:
+                            fwcode = j
+                            break
+                    break
+        else:
+            fwcode = codes[0]
+        if codes[1] in revcodes_toremove:
+            for c, u in counter.unique_reverse_barcodes[fq.inserts[1]].items():
+                for uc in u:
+                    if revcodes_toremove[codes[1]].startswith(uc):
+                        revcode = c
+                        break
+                if revcode:
+                    for j, c in revcodes.items():
+                        if c == revcode:
+                            revcode = j
+                            break
+                    break
+        else:
+            revcode = codes[1]
+
+        index = -4
+        ncodes = codes
+        if fwcode not in fwcodes_tokeep:
+            ncodes = ('', ncodes[1])
+            index += 1
+        if revcode not in revcodes_tokeep:
+            ncodes = (ncodes[0], '')
+            index += 2
+        if ncodes not in counts[-4]:
+            ndict = counts[index].setdefault(ncodes, {})
+            for i, c in counts[-4][codes].items():
+                ndict[i] = ndict.get(i, 0) + c
+            del counts[-4][codes]
+        elif ncodes[0] != codes[0] or ncodes[1] != ncodes[1]:
+            for i, c in counts[codes].items():
+                counts[-4][ncodes][i] += c
+
     unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
     counter.countReads(str(fq.file), str(unmatched), 4)
     assert counter.read == fq.totalreads
     assert counter.counted == fq.totalreads
-    for val, truth in zip(exps, counts):
+    for val, truth in zip(exps, fq.varcounts):
         assert val.counts == truth, "Counts don't match with expected values for experiment %s" % val.name
     assert counter.allowed_mismatches == 1
 
@@ -252,45 +319,45 @@ def test_unmatchable_barcodes(tmpdir):
     exps = [PyExperiment(str(i), {'insert': iseq, 'barcodes_fw': fwcodes, 'barcodes_rev': revcodes}) for i, iseq in enumerate(fq.inserts)]
     counter = PyReadCounter(exps)
 
-    for cc in fq.varcounts:
+    for i,cc in enumerate(fq.varcounts):
         for codes in list(cc.keys()):
             fwcode = None
             revcode = None
             if codes[0] in fwcodes_toremove:
-                for c, u in counter.unique_forward_barcodes.items():
+                for c, u in counter.unique_forward_barcodes[fq.inserts[i]].items():
                     for uc in u:
                         if fwcodes_toremove[codes[0]].startswith(uc):
                             fwcode = c
                             break
                     if fwcode:
-                        for i, c in fwcodes.items():
+                        for j, c in fwcodes.items():
                             if c == fwcode:
-                                fwcode = i
+                                fwcode = j
                                 break
                         break
             else:
                 fwcode = codes[0]
             if codes[1] in revcodes_toremove:
-                for c, u in counter.unique_reverse_barcodes.items():
+                for c, u in counter.unique_reverse_barcodes[fq.inserts[i]].items():
                     for uc in u:
                         if revcodes_toremove[codes[1]].startswith(uc):
                             revcode = c
                             break
                     if revcode:
-                        for i, c in revcodes.items():
+                        for j, c in revcodes.items():
                             if c == revcode:
-                                revcode = i
+                                revcode = j
                                 break
                         break
             else:
                 revcode = codes[1]
             if not fwcode or not revcode:
-                for i, c in cc[codes].items():
+                for j, c in cc[codes].items():
                     nunmatched += c
                 del cc[codes]
             elif fwcode != codes[0] or revcode != codes[1]:
-                for i, c in cc[codes].items():
-                    cc[(fwcode, revcode)][i] =  cc[(fwcode, revcode)].get(i, 0) + c
+                for j, c in cc[codes].items():
+                    cc[(fwcode, revcode)][j] =  cc[(fwcode, revcode)].get(j, 0) + c
                 del cc[codes]
 
     unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
