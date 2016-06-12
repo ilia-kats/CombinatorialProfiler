@@ -241,7 +241,7 @@ def test_no_forward_and_reverse_codes(tmpdir):
                         fwcode = c
                         break
                 if fwcode:
-                    for j, c in fwcodes.items():
+                    for j, c in fwcodes_tokeep.items():
                         if c == fwcode:
                             fwcode = j
                             break
@@ -255,7 +255,7 @@ def test_no_forward_and_reverse_codes(tmpdir):
                         revcode = c
                         break
                 if revcode:
-                    for j, c in revcodes.items():
+                    for j, c in revcodes_tokeep.items():
                         if c == revcode:
                             revcode = j
                             break
@@ -264,7 +264,7 @@ def test_no_forward_and_reverse_codes(tmpdir):
             revcode = codes[1]
 
         index = -4
-        ncodes = codes
+        ncodes = (fwcode, revcode)
         if fwcode not in fwcodes_tokeep:
             ncodes = ('', ncodes[1])
             index += 1
@@ -276,9 +276,10 @@ def test_no_forward_and_reverse_codes(tmpdir):
             for i, c in counts[-4][codes].items():
                 ndict[i] = ndict.get(i, 0) + c
             del counts[-4][codes]
-        elif ncodes[0] != codes[0] or ncodes[1] != ncodes[1]:
-            for i, c in counts[codes].items():
-                counts[-4][ncodes][i] += c
+        elif ncodes[0] != codes[0] or ncodes[1] != codes[1]:
+            for i, c in counts[-4][codes].items():
+                counts[-4][ncodes][i] = counts[-4][ncodes].get(i,0) + c
+            del counts[-4][codes]
 
     unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
     counter.countReads(str(fq.file), str(unmatched), 4)
