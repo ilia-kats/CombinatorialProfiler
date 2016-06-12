@@ -285,7 +285,8 @@ UniqueBarcodes makeUnique(const std::unordered_set<std::string> &codes)
     std::unordered_map<std::string, std::vector<std::string>> uniqueCodes;
     for (const auto &c : codes) {
         std::vector<std::string> u;
-        for (std::remove_reference<decltype(c)>::type::size_type i = 0; i < c.size(); ++i) {
+        u.push_back(c);
+        for (std::remove_reference<decltype(c)>::type::size_type i = 1; i < c.size(); ++i) {
             bool found = false;
             for (const auto &cc : codes) {
                 if (cc != c && cc.find(c.c_str() + i) != std::remove_reference<decltype(cc)>::type::npos) {

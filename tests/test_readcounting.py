@@ -10,8 +10,8 @@ class FastQCreator:
     ttable = str.maketrans('ATGC', 'TACG')
 
     @classmethod
-    def getnuc(cls):
-        return cls.nucleotides[random.randrange(0,4)]
+    def getnuc(cls, length):
+        return "".join([random.choice(cls.nucleotides) for n in range(length)])
 
     @classmethod
     def revcompl(cls, seq):
@@ -32,25 +32,25 @@ class FastQCreator:
 
         ncodes = random.randint(4, 10)
         while len(self.fwcodes) != ncodes:
-            self.fwcodes.add("".join([self.getnuc() for n in range(random.randint(6,20))]))
+            self.fwcodes.add(self.getnuc(random.randint(6,20)))
 
         ncodes = random.randint(4, 10)
         while len(self.revcodes) != ncodes:
-            self.revcodes.add("".join([self.getnuc() for n in range(random.randint(6,20))]))
+            self.revcodes.add(self.getnuc(random.randint(6,20)))
         self.fwcodes = list(self.fwcodes)
         self.revcodes = list(self.revcodes)
 
         while len(self.inserts) != ninserts:
             nucs = []
             for j in range(2):
-                nucs.append("".join([self.getnuc() for n in range(self.insertlength - self.varlength // 2)]))
+                nucs.append(self.getnuc(self.insertlength - self.varlength // 2))
             self.inserts.add(("N" * self.varlength).join(nucs))
         self.inserts = list(self.inserts)
 
         with self.file.open('w') as fq:
             for i in range(self.totalreads):
                 ins = random.randrange(0, len(self.inserts))
-                varins = "".join([self.getnuc() for n in range(self.varlength)])
+                varins = self.getnuc(self.varlength)
                 insert = self.inserts[ins].replace("N" * self.varlength, varins)
                 self.unique_inserts.add(varins)
 
