@@ -140,8 +140,10 @@ protected:
     static std::pair<std::string::size_type, uint16_t> fuzzy_find(const std::string &needle, const std::string &haystack)
     {
         auto totest = haystack.size() - needle.size();
-        std::vector<uint16_t> mismatches(totest);
+        std::vector<uint16_t> mismatches(totest, UINT16_MAX);
         auto mit = mismatches.begin();
+        bool haveZeroMismatches = false;
+        size_t zeroMismatchPos;
         for (size_t i = 0; i < totest; ++i, ++mit) {
             *mit = std::inner_product(needle.cbegin(),
                                       needle.cend(),
@@ -149,9 +151,18 @@ protected:
                                       static_cast<decltype(mismatches)::value_type>(0),
                                       std::plus<decltype(mismatches)::value_type>(),
                                       [](const std::remove_reference<decltype(needle)>::type::value_type &n, const std::remove_reference<decltype(haystack)>::type::value_type &h) -> bool {return static_cast<bool>(n ^ h);});
+            if (!*mit) {
+                haveZeroMismatches = true;
+                zeroMismatchPos = i;
+                break;
+            }
         }
-        auto bestmatch = std::min_element(mismatches.cbegin(), mismatches.cend());
-        return std::make_pair(std::distance(mismatches.cbegin(), bestmatch), *bestmatch);
+        if (haveZeroMismatches)
+            return std::make_pair(zeroMismatchPos, 0);
+        else {
+            auto bestmatch = std::min_element(mismatches.cbegin(), mismatches.cend());
+            return std::make_pair(std::distance(mismatches.cbegin(), bestmatch), *bestmatch);
+        }
     }
 };
 
@@ -238,32 +249,19 @@ public:
     bool match(Read &read, std::string *insert=nullptr) const
     {
         decltype(m_upstreamseq)::size_type start, end;
-        if (m_mismatches > 0) {
-            auto upstream = fuzzy_find(m_upstreamseq, read.getSequence());
-            if (upstream.second > m_mismatches) {
-                read = read.reverseComplement();
-                upstream = fuzzy_find(m_upstreamseq, read.getSequence());
-                if (upstream.second > m_mismatches)
-                    return false;
-            }
-            auto downstream = fuzzy_find(m_downstreamseq, read.getSequence());
-            if (downstream.second + upstream.second > m_mismatches)
+        auto upstream = fuzzy_find(m_upstreamseq, read.getSequence());
+        if (upstream.second > m_mismatches) {
+            read = read.reverseComplement();
+            upstream = fuzzy_find(m_upstreamseq, read.getSequence());
+            if (upstream.second > m_mismatches)
                 return false;
-            start = upstream.first + m_upstreamseq.size();
-            end = downstream.first;
-        } else {
-            start = read.getSequence().find(m_upstreamseq);
-            if (start == decltype(m_upstreamseq)::npos) {
-                read = read.reverseComplement();
-                start = read.getSequence().find(m_upstreamseq);
-                if (start == decltype(m_upstreamseq)::npos)
-                    return false;
-            }
-            end = read.getSequence().find(m_downstreamseq);
-            if (end == decltype(m_downstreamseq)::npos)
-                return false;
-            start += m_upstreamseq.size();
         }
+        auto downstream = fuzzy_find(m_downstreamseq, read.getSequence());
+        if (downstream.second + upstream.second > m_mismatches)
+            return false;
+        start = upstream.first + m_upstreamseq.size();
+        end = downstream.first;
+
         if (end - start != m_insertlength)
             return false;
 
