@@ -69,6 +69,6 @@ class MainWindow(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     main = MainWindow()
-    main.resize(1024, 768)
+    main.resize(1280, 1024)
     main.show()
     return app.exec()

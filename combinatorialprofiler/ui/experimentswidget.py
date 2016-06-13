@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from pkg_resources import resource_stream
 
 from PyQt5.QtWidgets import QWidget, QListWidgetItem

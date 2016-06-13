@@ -177,6 +177,7 @@ class ExperimentWidget(QWidget):
                 item = QTableWidgetItem(self.ui.sortedCellsTbl.itemPrototype())
                 item.setData(Qt.DisplayRole, str(f))
                 self.ui.sortedCellsTbl.setItem(fwrows[fw], revcols[rev], item)
+        self.ui.sortedCellsTbl.resizeColumnsToContents()
 
         if 'ndsi' in d:
             self.ui.ndsiGrp.setChecked(True)
