@@ -95,6 +95,25 @@ def exec_with_logging(args, pname, out=None, err=None):
         logging.error("%s with returncode %i" % (infostr, ret))
     return ret
 
+def plot_profiles(df, groupby, ndsicol, filename, experiment):
+    logging.info("Plotting read count profiles for experiment %s into %s" % (experiment, filename))
+    ctime1 = time.monotonic()
+    labels = sorted(df[ndsicol].cat.categories)
+    integer_map = dict([(val, i) for i, val in enumerate(labels)])
+    with PdfPages(filename) as pdf:
+        for (code, seq), group in df.groupby(groupby):
+            fig = plt.figure(figsize=(5,3))
+            plot = plt.plot(group[ndsicol].map(integer_map), group['normalized_counts'], 'ko-')
+            plt.xlim(0, len(labels) - 1)
+            plt.ylim(ymin=0)
+            plt.xticks(range(len(labels)), labels)
+            plt.title("%s %s" % (code, seq))
+            plt.ylabel("normalized counts")
+            pdf.savefig(bbox_inches='tight')
+            plt.close()
+    ctime2 = time.monotonic()
+    logging.info("Finished plotting read count profiles after %i seconds" % round(ctime2 - ctime1))
+
 def main():
     import argparse
     import difflib
@@ -217,26 +236,10 @@ def main():
 
             ndsi_byaa.to_csv(os.path.join(args.outdir, "%sNDSIs_byaa.csv" % prefix), index=False, encoding='utf-8')
             ndsi_bynuc.to_csv(os.path.join(args.outdir, "%sNDSIs_bynuc.csv" % prefix), index=False, encoding='utf-8')
-            labels = sorted(counts[ndsicol].cat.categories)
-            integer_map = dict([(val, i) for i, val in enumerate(labels)])
             if 'named_insert' in counts:
                 seqcol = 'named_insert'
             else:
                 seqcol = 'sequence'
-
-            logging.info("Plotting read count profiles for experiment %s" % e.name)
-            ctime1 = time.monotonic()
-            with PdfPages(os.path.join(args.outdir, "%scountplots.pdf" % prefix)) as pdf:
-                for (code, seq), group in counts.groupby([groupby, seqcol]):
-                    fig = plt.figure(figsize=(5,3))
-                    plot = plt.plot(group[ndsicol].map(integer_map), group['normalized_counts'], 'ko-')
-                    plt.xlim(0, len(labels) - 1)
-                    plt.ylim(ymin=0)
-                    plt.xticks(range(len(labels)), labels)
-                    plt.title("%s %s" % (code, seq))
-                    plt.ylabel("normalized counts")
-                    pdf.savefig(bbox_inches='tight')
-                    plt.close()
-            ctime2 = time.monotonic()
-            logging.info("Finished plotting read count profiles after %i seconds" % round(ctime2 - ctime1))
+            plot_profiles(counts, [groupby, seqcol], ndsicol, os.path.join(args.outdir, "%sbynuc_countplots.pdf" % prefix), e.name)
+            plot_profiles(counts.groupby([groupby, ndsicol, 'translation'])['normalized_counts'].sum().reset_index(), [groupby, 'translation'], ndsicol, os.path.join(args.outdir, "%sbyaa_countplots.pdf" % prefix), e.name)
     return 0
