@@ -53,7 +53,7 @@ class MainWidget(QWidget):
                     d = json.load(f)
                     self.ui.settingsTab.unserialize(d)
                     self.ui.experimentsTab.unserialize(d['experiments'])
-            except Exception as e:
+            except BaseException as e:
                 QMessageBox.critical(self, "Error", str(e))
 
     def closeClicked(self):
