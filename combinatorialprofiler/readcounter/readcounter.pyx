@@ -42,8 +42,9 @@ cdef extern from "cReadCounter.h" nogil:
         Counts counts
 
     cdef cppclass ReadCounter:
-        ReadCounter(vector[Experiment*], uint16_t mismatches) except+
+        ReadCounter(vector[Experiment*], uint16_t mismatches, uint16_t unique_barcode_length) except+
         void countReads(const string&, const string&, int)
+        uint16_t minimumUniqueBarcodeLength()
         uint16_t allowedMismatches()
         uint64_t read()
         uint64_t unmatchedTotal()
@@ -192,13 +193,13 @@ cdef class PyReadCounter:
     cdef ReadCounter *_rdcntr
     cdef list _exprmnts
 
-    def __cinit__(self, list experiments, int mismatches=1):
+    def __cinit__(self, list experiments, int mismatches=1, int minlength=0):
         cdef vector[Experiment*] vec
         cdef PyExperiment exp;
         self._exprmnts = experiments
         for exp in self._exprmnts:
             vec.push_back((<PyExperiment>exp)._exprmnt)
-        self._rdcntr = new ReadCounter(vec, mismatches)
+        self._rdcntr = new ReadCounter(vec, mismatches, minlength)
 
     def __dealloc__(self):
         del self._rdcntr

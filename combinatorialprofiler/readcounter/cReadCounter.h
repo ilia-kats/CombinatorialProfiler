@@ -45,12 +45,13 @@ class Node;
 class ReadCounter
 {
 public:
-    ReadCounter(std::vector<Experiment*>, uint16_t insert_mismatches = 1);
+    ReadCounter(std::vector<Experiment*>, uint16_t insert_mismatches = 1, uint16_t unique_barcode_length = 0);
     ~ReadCounter();
 
     void countReads(const std::string&, const std::string&, int threads=1);
 
     uint16_t allowedMismatches() const;
+    uint16_t minimumUniqueBarcodeLength() const;
 
     uint64_t read() const;
     uint64_t counted() const;
@@ -67,6 +68,7 @@ private:
     struct ThreadSynchronization;
 
     uint16_t m_allowedMismatches;
+    uint16_t m_uniqueBarcodeLength;
 
     uint64_t m_read;
     uint64_t m_counted;

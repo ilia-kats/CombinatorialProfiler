@@ -308,16 +308,19 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
     logging.basicConfig(filename=os.path.join(args.outdir, 'run_log.txt'), filemode='w', format='%(levelname)s:%(asctime)s:%(message)s', level=getattr(logging, args.log_level))
 
+    logging.info("%s version %s" % (parser.prog, version))
     logging.info(" ".join(sys.argv))
 
     # do this right away to make the user immediately aware of any exceptions that might occur due to
     # a malformed config file
-    experimentsdict = json.load(open(args.configuration))
+    config = json.load(open(args.configuration))
     experiments = []
-    for k,v in experimentsdict['experiments'].items():
+    for k,v in config['experiments'].items():
         exp = PyExperiment(k, v)
         experiments.append(exp)
         logging.debug(json.dumps(exp, indent=4, cls=PyExperimentJSONEncoder))
+
+    counter = PyReadCounter(experiments, config.get('insert_mismatches', 0), config.get('barcode_length', 0))
 
     stime = time.monotonic()
 
@@ -375,7 +378,6 @@ def main():
 
     unmatcheddir = os.path.join(args.outdir, "%s_unmapped" % mergedfqname)
     os.makedirs(unmatcheddir, exist_ok=True)
-    counter = PyReadCounter(experiments)
 
     logging.info("Starting counting reads")
     ctime1 = time.monotonic()

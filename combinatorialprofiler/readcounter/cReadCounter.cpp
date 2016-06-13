@@ -294,31 +294,32 @@ private:
     uint16_t m_insertlength;
 };
 
-UniqueBarcodes makeUnique(const std::unordered_set<std::string> &codes)
+UniqueBarcodes makeUnique(const std::unordered_set<std::string> &codes, uint16_t minlength)
 {
     std::unordered_map<std::string, std::vector<std::string>> uniqueCodes;
     for (const auto &c : codes) {
         std::vector<std::string> u;
         u.push_back(c);
-        // TODO: add parameter for minimum barcode length, expose to Python
-        for (std::remove_reference<decltype(c)>::type::size_type i = 1; i < c.size(); ++i) {
-            bool found = false;
-            for (const auto &cc : codes) {
-                if (cc != c && cc.find(c.c_str() + i) != std::remove_reference<decltype(cc)>::type::npos) {
-                    found = true;
-                    break;
+        if (minlength) {
+            for (std::remove_reference<decltype(c)>::type::size_type i = 1; i < c.size() && c.size() - i >= minlength; ++i) {
+                bool found = false;
+                for (const auto &cc : codes) {
+                    if (cc != c && cc.find(c.c_str() + i) != std::remove_reference<decltype(cc)>::type::npos) {
+                        found = true;
+                        break;
+                    }
                 }
+                if (!found)
+                    u.push_back(c.substr(i));
             }
-            if (!found)
-                u.push_back(c.substr(i));
         }
         uniqueCodes[c] = std::move(u);
     }
     return uniqueCodes;
 }
 
-ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_mismatches)
-: m_allowedMismatches(insert_mismatches), m_read(0), m_counted(0), m_unmatchedTotal(0), m_unmatchedInsert(0), m_unmatchedBarcodes(0), m_unmatchedInsertSequence(0), m_written(0), m_experiments(experiments)
+ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_mismatches, uint16_t unique_barcode_length)
+: m_allowedMismatches(insert_mismatches), m_uniqueBarcodeLength(unique_barcode_length), m_read(0), m_counted(0), m_unmatchedTotal(0), m_unmatchedInsert(0), m_unmatchedBarcodes(0), m_unmatchedInsertSequence(0), m_written(0), m_experiments(experiments)
 {
     std::unordered_map<std::string, std::unordered_set<std::string>> fwCodes;
     std::unordered_map<std::string, std::unordered_set<std::string>> revCodes;
@@ -338,10 +339,10 @@ ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_m
     }
 
     for (const auto &c : fwCodes) {
-        m_uniqueFwCodes[c.first] = makeUnique(c.second);
+        m_uniqueFwCodes[c.first] = makeUnique(c.second, m_uniqueBarcodeLength);
     }
     for (const auto &c : revCodes) {
-        m_uniqueRevCodes[c.first] = makeUnique(c.second);
+        m_uniqueRevCodes[c.first] = makeUnique(c.second, m_uniqueBarcodeLength);
     }
 
     std::unordered_map<std::string, std::unordered_map<std::string, BarcodeNode*>> fwNodes;
@@ -455,6 +456,11 @@ void ReadCounter::countReads(const std::string &file, const std::string &outpref
 uint16_t ReadCounter::allowedMismatches() const
 {
     return m_allowedMismatches;
+}
+
+uint16_t ReadCounter::minimumUniqueBarcodeLength() const
+{
+    return m_uniqueBarcodeLength;
 }
 
 uint64_t ReadCounter::read() const

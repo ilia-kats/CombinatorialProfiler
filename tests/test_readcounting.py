@@ -77,7 +77,7 @@ def simplecounts(tmpdir, mismatches):
         d['barcodes_fw'] = make_barcodes_dict(fq.fwcodes)
         d['barcodes_rev'] = make_barcodes_dict(fq.revcodes)
         exps.append(PyExperiment(str(i[0]), d))
-    counter = PyReadCounter(exps, mismatches)
+    counter = PyReadCounter(exps, mismatches, 1)
 
     unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
     counter.countReads(str(fq.file), str(unmatched), 4)
@@ -110,7 +110,7 @@ def test_namedinserts(tmpdir):
                 unmatched += counts
     d = {'insert': fq.inserts[0], 'barcodes_fw': make_barcodes_dict(fq.fwcodes), 'barcodes_rev': make_barcodes_dict(fq.revcodes), 'named_inserts': nins}
     exp = PyExperiment('test', d)
-    counter = PyReadCounter([exp])
+    counter = PyReadCounter([exp], minlength=1)
 
     unmatcheddir = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
     counter.countReads(str(fq.file), str(unmatcheddir), 4)
@@ -137,7 +137,7 @@ def test_no_reverse_codes(tmpdir):
         PyExperiment("reduced", {'insert': fq.inserts[1], 'barcodes_fw': fwcodes, 'barcodes_rev': revcodes_tokeep}),
         PyExperiment("norevcodes", {'insert': fq.inserts[1], 'barcodes_fw': fwcodes})
     ]
-    counter = PyReadCounter(exps)
+    counter = PyReadCounter(exps, minlength=1)
 
     for codes in list(fq.varcounts[-2].keys()):
         if codes[1] in revcodes_toremove:
@@ -181,7 +181,7 @@ def test_no_forward_codes(tmpdir):
         PyExperiment("reduced", {'insert': fq.inserts[1], 'barcodes_rev': revcodes, 'barcodes_fw': fwcodes_tokeep}),
         PyExperiment("nofwcodes", {'insert': fq.inserts[1], 'barcodes_rev': revcodes})
     ]
-    counter = PyReadCounter(exps)
+    counter = PyReadCounter(exps, minlength=1)
 
     for codes in list(fq.varcounts[-2].keys()):
         if codes[0] in fwcodes_toremove:
@@ -297,7 +297,7 @@ def test_unmatchable_inserts(tmpdir):
             nunmatched += c
 
     exps = [PyExperiment(str(i), {'insert': iseq, 'barcodes_fw': make_barcodes_dict(fq.fwcodes), 'barcodes_rev': make_barcodes_dict(fq.revcodes)}) for i, iseq in enumerate(fq.inserts[:-1])]
-    counter = PyReadCounter(exps)
+    counter = PyReadCounter(exps, minlength=1)
 
     unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
     counter.countReads(str(fq.file), str(unmatched), 4)
@@ -318,7 +318,7 @@ def test_unmatchable_barcodes(tmpdir):
     revcodes = {str(i) : fq.revcodes[i] for i in random.sample(range(len(fq.revcodes)), int(0.8 * len(fq.revcodes)))}
     revcodes_toremove = {str(i): fq.revcodes[i] for i in range(len(fq.revcodes)) if str(i) not in revcodes}
     exps = [PyExperiment(str(i), {'insert': iseq, 'barcodes_fw': fwcodes, 'barcodes_rev': revcodes}) for i, iseq in enumerate(fq.inserts)]
-    counter = PyReadCounter(exps)
+    counter = PyReadCounter(exps, minlength=1)
 
     for i,cc in enumerate(fq.varcounts):
         for codes in list(cc.keys()):

@@ -1,6 +1,4 @@
 #-*- coding: utf-8 -*-
-import os.path
-
 from pkg_resources import resource_stream
 
 from PyQt5.QtWidgets import QWidget, QTableWidgetItem
@@ -63,7 +61,4 @@ class TwoColumnWidget(QWidget):
         return self.ui.seqTbl.rowCount()
 
     def serialize(self):
-        d = {}
-        for i in range(self.ui.seqTbl.rowCount()):
-            d[self.ui.seqTbl.item(i, 1).text()] = self.ui.seqTbl.item(i,0).text()
-        return d
+        return {self.ui.seqTbl.item(i, 1).text() : self.ui.seqTbl.item(i,0).text() for i in range(self.ui.seqTbl.rowCount())}
