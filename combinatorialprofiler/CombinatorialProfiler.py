@@ -41,6 +41,8 @@ def getNDSI(df, nspec):
     else:
         return None
 
+    statsfuns = ['min', 'max', 'mean', 'median', 'std', 'sum', ('nfractions', 'size')]
+
     fractionvals = pd.Series(range(1, df[ndsicol].cat.categories.size + 1), index=sorted(df[ndsicol].cat.categories))
 
     df['normalized_counts_cells'] = df.set_index(ndsicol, append=True)['normalized_counts'].mul(fractionvals, level=1).reset_index(level=1, drop=True)
@@ -52,14 +54,18 @@ def getNDSI(df, nspec):
     g = df.groupby(groupbyl + ['translation','sequence'])
     byseq = (g['normalized_counts_cells'].sum() / g['normalized_counts'].sum()).dropna()
     byseq.name = 'ndsi'
+    byseq_stats = g.agg({'counts': statsfuns, 'normalized_counts': statsfuns})
+    byseq_stats.columns = ['_'.join(col) for col in byseq_stats.columns.values]
 
     byaa_median = byseq.groupby(level=groupbyl + ['translation']).median().dropna()
     byaa_median.name = 'median_ndsi'
 
     g = df.groupby(groupbyl + ['translation'])
-    byaa_pooled = g['normalized_counts_cells'].sum() / g['normalized_counts'].sum().dropna()
+    byaa_pooled = (g['normalized_counts_cells'].sum() / g['normalized_counts'].sum()).dropna()
     byaa_pooled.name = 'pooled_ndsi'
-    return (groupby, ndsicol, pd.concat((byaa_median, byaa_pooled), axis=1).dropna().reset_index(), byseq.reset_index())
+    byaa_stats = g.agg({'counts': statsfuns, 'normalized_counts': statsfuns})
+    byaa_stats.columns = ['_'.join(col) for col in byaa_stats.columns.values]
+    return (groupby, ndsicol, pd.concat((byaa_median, byaa_pooled, byaa_stats), axis=1).reset_index().dropna(subset=('median_ndsi', 'pooled_ndsi')), pd.concat((byseq, byseq_stats), axis=1).reset_index().dropna(subset=['ndsi']))
 
 class PyExperimentJSONEncoder(json.JSONEncoder):
     def default(self, o):
