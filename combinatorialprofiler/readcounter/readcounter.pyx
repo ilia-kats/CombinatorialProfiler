@@ -137,7 +137,7 @@ cdef class PyExperiment:
         df['sequence'] = sequence
         df['counts'] = counts
 
-        if len(self.named_inserts):
+        if len(insertsdict):
             df['named_insert'] = [insertsdict[s] for s in sequence]
 
         return df

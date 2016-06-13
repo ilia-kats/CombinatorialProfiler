@@ -3795,27 +3795,24 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_9counts_df___get__(struct
  *         df['sequence'] = sequence
  *         df['counts'] = counts             # <<<<<<<<<<<<<<
  * 
- *         if len(self.named_inserts):
+ *         if len(insertsdict):
  */
   if (unlikely(PyObject_SetItem(__pyx_v_df, __pyx_n_s_counts, __pyx_v_counts) < 0)) __PYX_ERR(0, 138, __pyx_L1_error)
 
   /* "readcounter.pyx":140
  *         df['counts'] = counts
  * 
- *         if len(self.named_inserts):             # <<<<<<<<<<<<<<
+ *         if len(insertsdict):             # <<<<<<<<<<<<<<
  *             df['named_insert'] = [insertsdict[s] for s in sequence]
  * 
  */
-  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_n_s_named_inserts); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 140, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_6);
-  __pyx_t_4 = PyObject_Length(__pyx_t_6); if (unlikely(__pyx_t_4 == -1)) __PYX_ERR(0, 140, __pyx_L1_error)
-  __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+  __pyx_t_4 = PyObject_Length(__pyx_v_insertsdict); if (unlikely(__pyx_t_4 == -1)) __PYX_ERR(0, 140, __pyx_L1_error)
   __pyx_t_13 = (__pyx_t_4 != 0);
   if (__pyx_t_13) {
 
     /* "readcounter.pyx":141
  * 
- *         if len(self.named_inserts):
+ *         if len(insertsdict):
  *             df['named_insert'] = [insertsdict[s] for s in sequence]             # <<<<<<<<<<<<<<
  * 
  *         return df
@@ -3845,7 +3842,7 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_9counts_df___get__(struct
     /* "readcounter.pyx":140
  *         df['counts'] = counts
  * 
- *         if len(self.named_inserts):             # <<<<<<<<<<<<<<
+ *         if len(insertsdict):             # <<<<<<<<<<<<<<
  *             df['named_insert'] = [insertsdict[s] for s in sequence]
  * 
  */

@@ -115,13 +115,13 @@ class DFCreator:
                 counts.append(c)
         self.sortedcells_df = pd.Series(counts, index=pd.MultiIndex.from_arrays((barcode_fw, barcode_rev), names=('barcode_fw', 'barcode_rev')))
 
-#def test_ndsicalc():
-    #simu = DFCreator()
-    #ncounts = normalizeCounts(simu.df, simu.sortedcells_df)
-    #ncounts['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in ncounts.itertuples()])
-    #groupby, ndsicol, ndsi_byaa, ndsi_bynuc = getNDSI(ncounts, NDSIS.reverse)
-    #for ndsi in ndsi_byaa.itertuples():
-        #assert round(ndsi.median_ndsi, 5) == round(simu.ndsi_aa_median[ndsi.barcode_fw][ndsi.translation], 5)
-        #assert round(ndsi.pooled_ndsi, 5) == round(simu.ndsi_aa_pooled[ndsi.barcode_fw][ndsi.translation], 5)
-    #for ndsi in ndsi_bynuc.itertuples():
-        #assert round(ndsi.ndsi, 5) == round(simu.ndsi_nuc[ndsi.barcode_fw][ndsi.sequence], 5)
+def test_ndsicalc():
+    simu = DFCreator()
+    ncounts = normalizeCounts(simu.df, simu.sortedcells_df)
+    ncounts['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in ncounts.itertuples()])
+    groupby, ndsicol, ndsi_byaa, ndsi_bynuc = getNDSI(ncounts, NDSIS.reverse)
+    for ndsi in ndsi_byaa.itertuples():
+        assert round(ndsi.median_ndsi, 5) == round(simu.ndsi_aa_median[ndsi.barcode_fw][ndsi.translation], 5)
+        assert round(ndsi.pooled_ndsi, 5) == round(simu.ndsi_aa_pooled[ndsi.barcode_fw][ndsi.translation], 5)
+    for ndsi in ndsi_bynuc.itertuples():
+        assert round(ndsi.ndsi, 5) == round(simu.ndsi_nuc[ndsi.barcode_fw][ndsi.sequence], 5)

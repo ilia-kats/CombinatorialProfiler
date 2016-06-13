@@ -230,18 +230,6 @@ def normalizeCounts(df, sortedcells):
     return df
 
 def getNDSI(df, nspec):
-    def ndsicalc(x, fractionvals):
-        return sum((x * fractionvals).dropna()) / sum(x)
-
-    def calcNDSIaa(group, ndsicol, fractionvals):
-        g = group.set_index(ndsicol)
-        pooled = ndsicalc(g.groupby(level=ndsicol)['normalized_counts'].sum().dropna(), fractionvals)
-        med = g.groupby('sequence')['normalized_counts'].aggregate(ndsicalc, fractionvals).median()
-        return pd.Series({'median_ndsi': med, 'pooled_ndsi': pooled})
-    def calcNDSInuc(group, ndsicol, fractionvals):
-        g = group.set_index(ndsicol)
-        return pd.Series({'ndsi':ndsicalc(g['normalized_counts'], fractionvals)})
-
     if nspec == NDSIS.forward:
         groupby = 'barcode_rev'
         ndsicol = 'barcode_fw'
@@ -250,11 +238,26 @@ def getNDSI(df, nspec):
         ndsicol = 'barcode_rev'
     else:
         return None
-    groupbyl = ['experiment', groupby, 'translation']
+
+    fractionvals = pd.Series(range(1, df[ndsicol].cat.categories.size + 1), index=sorted(df[ndsicol].cat.categories))
+
+    df['normalized_counts_cells'] = df.set_index(ndsicol, append=True)['normalized_counts'].mul(fractionvals, level=1).reset_index(level=1, drop=True)
+
+    groupbyl = ['experiment', groupby]
     if 'named_insert' in df.columns:
         groupbyl.append('named_insert')
-    fractionvals = pd.Series(range(1, df[ndsicol].cat.categories.size + 1), index=sorted(df[ndsicol].cat.categories))
-    return (groupby, ndsicol, df.groupby(groupbyl).apply(calcNDSIaa, ndsicol, fractionvals).dropna().reset_index(), df.groupby(groupbyl + ['sequence']).apply(calcNDSInuc, ndsicol, fractionvals).dropna().reset_index())
+
+    g = df.groupby(groupbyl + ['translation','sequence'])
+    byseq = (g['normalized_counts_cells'].sum() / g['normalized_counts'].sum()).dropna()
+    byseq.name = 'ndsi'
+
+    byaa_median = byseq.groupby(level=groupbyl + ['translation']).median().dropna()
+    byaa_median.name = 'median_ndsi'
+
+    g = df.groupby(groupbyl + ['translation'])
+    byaa_pooled = g['normalized_counts_cells'].sum() / g['normalized_counts'].sum().dropna()
+    byaa_pooled.name = 'pooled_ndsi'
+    return (groupby, ndsicol, pd.concat((byaa_median, byaa_pooled), axis=1).dropna().reset_index(), byseq.reset_index())
 
 class PyExperimentJSONEncoder(json.JSONEncoder):
     def default(self, o):
@@ -311,7 +314,7 @@ def main():
     # a malformed config file
     experimentsdict = json.load(open(args.configuration))
     experiments = []
-    for k,v in experimentsdict.items():
+    for k,v in experimentsdict['experiments'].items():
         exp = PyExperiment(k, v)
         experiments.append(exp)
         logging.debug(json.dumps(exp, indent=4, cls=PyExperimentJSONEncoder))
