@@ -74,7 +74,6 @@ class ExperimentWidget(QWidget):
     def revCodeRemoved(self, column):
         ncol = self.ui.sortedCellsTbl.columnCount()
         fwcount = self.ui.barcodes_fw.count()
-        print(ncol, fwcount)
         if ncol > 1 or not fwcount:
             self.ui.sortedCellsTbl.removeColumn(column)
             if ncol == 1:
@@ -105,3 +104,29 @@ class ExperimentWidget(QWidget):
             d['sortedcells'] = cells
         return d
 
+    def unserialize(self, d):
+        self.ui.sortedCellsTbl.clear()
+
+        self.ui.insertSequence.setText(d.get('insert', ''))
+        self.ui.barcodes_fw.unserialize(d.get('barcodes_fw', {}))
+        self.ui.barcodes_rev.unserialize(d.get('barcodes_rev', {}))
+        self.ui.named_inserts.unserialize(d.get('named_inserts', {}))
+
+        fwrows = {}
+        revcols = {}
+        for r in range(self.ui.sortedCellsTbl.rowCount()):
+            fwrows[self.ui.sortedCellsTbl.model().headerData(r, Qt.Vertical)] = r
+        for c in range(self.ui.sortedCellsTbl.columnCount()):
+            revcols[self.ui.sortedCellsTbl.model().headerData(c, Qt.Horizontal)] = c
+        for fw, r in d.get('sortedcells', {}).items():
+            for rev, f in r.items():
+                item = QTableWidgetItem(self.ui.sortedCellsTbl.itemPrototype())
+                item.setData(Qt.DisplayRole, str(f))
+                self.ui.sortedCellsTbl.setItem(fwrows[fw], revcols[rev], item)
+
+        if 'ndsi' in d:
+            self.ui.ndsiGrp.setChecked(True)
+            if d['ndsi'] == 'forward':
+                self.ui.ndsiOnFw.setChecked(True)
+            elif d['ndsi'] == 'reverse':
+                self.ui.ndsiOnRev.setChecked(True)

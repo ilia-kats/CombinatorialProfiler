@@ -7,7 +7,7 @@ import json
 
 from pkg_resources import resource_stream
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QListWidgetItem, QTableWidgetItem, QDialogButtonBox, QFileDialog
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QListWidgetItem, QTableWidgetItem, QDialogButtonBox, QFileDialog, QMessageBox
 from PyQt5.QtCore import QRegExp, Qt
 from PyQt5.QtGui import QDoubleValidator, QRegExpValidator
 from PyQt5 import uic
@@ -24,6 +24,7 @@ class MainWidget(QWidget):
         self.ui.setupUi(self)
 
         self.ui.buttonBox.button(QDialogButtonBox.Save).clicked.connect(self.saveClicked)
+        self.ui.buttonBox.button(QDialogButtonBox.Open).clicked.connect(self.openClicked)
         self.ui.buttonBox.button(QDialogButtonBox.Close).clicked.connect(self.closeClicked)
 
     def saveClicked(self):
@@ -38,6 +39,22 @@ class MainWidget(QWidget):
                 d = self.ui.settingsTab.serialize()
                 d['experiments'] = self.ui.experimentsTab.serialize()
                 json.dump(d, f, indent=4)
+
+    def openClicked(self):
+        dlg = QFileDialog(self)
+        dlg.setDefaultSuffix("json")
+        dlg.setFileMode(QFileDialog.ExistingFile)
+        dlg.setAcceptMode(QFileDialog.AcceptOpen)
+        dlg.setNameFilters(("JSON files (*.json)", "All files (*)"))
+        if dlg.exec():
+            path = dlg.selectedFiles()[0]
+            try:
+                with open(path, 'r') as f:
+                    d = json.load(f)
+                    self.ui.settingsTab.unserialize(d)
+                    self.ui.experimentsTab.unserialize(d['experiments'])
+            except Exception as e:
+                QMessageBox.critical(self, "Error", str(e))
 
     def closeClicked(self):
         QApplication.exit()

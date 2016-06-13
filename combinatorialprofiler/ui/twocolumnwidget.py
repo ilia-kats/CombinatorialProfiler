@@ -34,16 +34,23 @@ class TwoColumnWidget(QWidget):
     def setLabel(self, label):
         self.ui.label.setText(label)
 
-    def addSequence(self):
+    def addSequence(self, name=None, sequence=None):
+        nameitem = QTableWidgetItem(self.ui.seqTbl.itemPrototype())
+        seqitem = QTableWidgetItem(self.ui.seqTbl.itemPrototype())
+
+        if name:
+            nameitem.setText(name)
+        if sequence:
+            seqitem.setText(sequence)
+
         nrow = self.ui.seqTbl.rowCount()
         self.ui.seqTbl.insertRow(nrow)
-        nameitem = QTableWidgetItem(self.ui.seqTbl.itemPrototype())
         self.rowAdded.emit(nrow + 1, nameitem.text())
         self.ui.seqTbl.setItem(nrow, 0, nameitem)
-        self.ui.seqTbl.setItem(nrow, 1, QTableWidgetItem(self.ui.seqTbl.itemPrototype()))
+        self.ui.seqTbl.setItem(nrow, 1, seqitem)
         self.ui.seqTbl.setCurrentItem(nameitem)
-        self.ui.seqTbl.editItem(nameitem)
-
+        if not name:
+            self.ui.seqTbl.editItem(nameitem)
 
     def removeSequences(self):
         selected = self.ui.seqTbl.selectionModel().selectedRows()
@@ -61,4 +68,10 @@ class TwoColumnWidget(QWidget):
         return self.ui.seqTbl.rowCount()
 
     def serialize(self):
-        return {self.ui.seqTbl.item(i, 1).text() : self.ui.seqTbl.item(i,0).text() for i in range(self.ui.seqTbl.rowCount())}
+        return {self.ui.seqTbl.item(i, 0).text() : self.ui.seqTbl.item(i,1).text() for i in range(self.ui.seqTbl.rowCount())}
+
+    def unserialize(self, d):
+        self.ui.seqTbl.clear()
+        for k in sorted(d.keys()):
+            self.addSequence(k, d[k])
+        self.ui.seqTbl.resizeColumnsToContents()
