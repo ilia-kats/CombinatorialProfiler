@@ -158,14 +158,14 @@
           </spacer>
          </item>
          <item>
-          <widget class="QPushButton" name="fromFileBtn">
+          <widget class="QToolButton" name="fromFileBtn">
            <property name="text">
             <string/>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="fromClipboardBtn">
+          <widget class="QToolButton" name="fromClipboardBtn">
            <property name="text">
             <string/>
            </property>

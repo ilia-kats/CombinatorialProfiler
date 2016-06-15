@@ -59,23 +59,35 @@
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_2">
      <item>
-      <widget class="QPushButton" name="addBtn">
+      <widget class="QToolButton" name="addBtn">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
        <property name="text">
         <string>+</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="removeBtn">
+      <widget class="QToolButton" name="removeBtn">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
        <property name="text">
         <string>-</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="fromFileBtn">
+      <widget class="QToolButton" name="fromFileBtn">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+        <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
@@ -83,9 +95,9 @@
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="fromClipboardBtn">
+      <widget class="QToolButton" name="fromClipboardBtn">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+        <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
