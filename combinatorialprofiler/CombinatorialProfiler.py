@@ -8,6 +8,7 @@ import csv
 import json
 import logging
 import time
+import pickle
 
 import pandas as pd
 import numpy as np
@@ -31,23 +32,33 @@ def normalizeCounts(df, sortedcells):
     df.barcode_rev = df.barcode_rev.astype("category")
     return df
 
-def getNDSI(df, nspec):
-    if nspec == NDSIS.forward:
-        groupby = 'barcode_rev'
-        ndsicol = 'barcode_fw'
-    elif nspec == NDSIS.reverse:
-        groupby = 'barcode_fw'
-        ndsicol = 'barcode_rev'
-    else:
-        return None
+class NDSISpec(object):
+    pass
 
+def getNDSISpec(e):
+    nspec = NDSISpec()
+    if e.ndsi == NDSIS.noNDSI:
+        return None
+    elif e.ndsi == NDSIS.forward:
+        nspec.groupby = 'barcode_rev'
+        nspec.ndsicol = 'barcode_fw'
+    elif e.ndsi == NDSIS.reverse:
+        nspec.groupby = 'barcode_fw'
+        nspec.ndsicol = 'barcode_rev'
+    if len(e.named_inserts):
+        nspec.seqcol = 'named_insert'
+    else:
+        nspec.seqcol = 'sequence'
+    return nspec
+
+def getNDSI(df, nspec):
     statsfuns = ['min', 'max', 'mean', 'median', 'std', 'sum', ('nfractions', 'size')]
 
-    fractionvals = pd.Series(range(1, df[ndsicol].cat.categories.size + 1), index=sorted(df[ndsicol].cat.categories))
+    fractionvals = pd.Series(range(1, df[nspec.ndsicol].cat.categories.size + 1), index=sorted(df[nspec.ndsicol].cat.categories))
 
-    df['normalized_counts_cells'] = df.set_index(ndsicol, append=True)['normalized_counts'].mul(fractionvals, level=1).reset_index(level=1, drop=True)
+    df['normalized_counts_cells'] = df.set_index(nspec.ndsicol, append=True)['normalized_counts'].mul(fractionvals, level=1).reset_index(level=1, drop=True)
 
-    groupbyl = ['experiment', groupby]
+    groupbyl = ['experiment', nspec.groupby]
     if 'named_insert' in df.columns:
         groupbyl.append('named_insert')
 
@@ -65,7 +76,7 @@ def getNDSI(df, nspec):
     byaa_pooled.name = 'pooled_ndsi'
     byaa_stats = g.agg({'counts': statsfuns, 'normalized_counts': statsfuns})
     byaa_stats.columns = ['_'.join(col) for col in byaa_stats.columns.values]
-    return (groupby, ndsicol, pd.concat((byaa_median, byaa_pooled, byaa_stats), axis=1).reset_index().dropna(subset=('median_ndsi', 'pooled_ndsi')), pd.concat((byseq, byseq_stats), axis=1).reset_index().dropna(subset=['ndsi']))
+    return (pd.concat((byaa_median, byaa_pooled, byaa_stats), axis=1).reset_index().dropna(subset=('median_ndsi', 'pooled_ndsi')), pd.concat((byseq, byseq_stats), axis=1).reset_index().dropna(subset=['ndsi']))
 
 class PyExperimentJSONEncoder(json.JSONEncoder):
     def default(self, o):
@@ -113,6 +124,19 @@ def plot_profiles(df, groupby, ndsicol, filename, experiment):
             plt.close()
     ctime2 = time.monotonic()
     logging.info("Finished plotting read count profiles after %i seconds" % round(ctime2 - ctime1))
+
+def dump_df(df, prefix):
+    df.to_csv(prefix + '.csv', index=False, encoding='utf-8', float_format="%.10f")
+    df.to_pickle(prefix + '.pkl')
+
+def read_df_if_exists(prefix, read=True):
+    if os.path.isfile(prefix + '.pkl'):
+        if read:
+            return pd.read_pickle(prefix + '.pkl')
+        else:
+            return True
+    else:
+        return False
 
 def main():
     import argparse
@@ -206,40 +230,70 @@ def main():
     unmatcheddir = os.path.join(args.outdir, "%s_unmapped" % mergedfqname)
     os.makedirs(unmatcheddir, exist_ok=True)
 
-    logging.info("Starting counting reads")
-    ctime1 = time.monotonic()
-    counter.countReads(os.path.join(intermediate_outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped"), args.threads)
-    ctime2 = time.monotonic()
-    logging.info("Finished counting reads after %i seconds" % round(ctime2 - ctime1))
-    logging.debug("Unique forward barcodes: %s" % json.dumps(counter.unique_forward_barcodes, indent=4))
-    logging.debug("Unique reverse barcodes: %s" % json.dumps(counter.unique_reverse_barcodes, indent=4))
+    prefixes = {}
+    rawcountsprefixes = {}
+    have_counts = True
+    for e in experiments:
+        if not len(e.name):
+            prefixes[e] = ''
+        else:
+            prefixes[e] = "%s_" % e.name
+        rawcountsprefixes[e] = os.path.join(args.outdir, "%sraw_counts" % prefixes[e])
+        if not read_df_if_exists(rawcountsprefixes[e], False):
+            have_counts = False
+            break
+
+    if args.resume and have_counts:
+        logging.info("Found raw counts for all experiments and resume is requested, continuing")
+    else:
+        args.resume = False
+        logging.info("Starting counting reads")
+        ctime1 = time.monotonic()
+        counter.countReads(os.path.join(intermediate_outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped"), args.threads)
+        ctime2 = time.monotonic()
+        logging.info("Finished counting reads after %i seconds" % round(ctime2 - ctime1))
+        logging.debug("Unique forward barcodes: %s" % json.dumps(counter.unique_forward_barcodes, indent=4))
+        logging.debug("Unique reverse barcodes: %s" % json.dumps(counter.unique_reverse_barcodes, indent=4))
 
     for e in experiments:
-        counts = e.counts_df
-        if len(e.sorted_cells):
-            logging.info("Normalizing counts for experiment %s" % e.name)
-            counts = normalizeCounts(counts, e.sorted_cells_df)
-        counts['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in counts.itertuples()])
-
-        if not len(e.name):
-            prefix = ''
+        if args.resume and have_counts:
+            counts = read_df_if_exists(rawcountsprefixes[e])
         else:
-            prefix = "%s_" % e.name
-        counts.to_csv(os.path.join(args.outdir, "%sraw_counts.csv" % prefix), index=False, encoding='utf-8')
+            args.resume = False
+            counts = e.counts_df
+            if len(e.sorted_cells):
+                logging.info("Normalizing counts for experiment %s" % e.name)
+                counts = normalizeCounts(counts, e.sorted_cells_df)
+            counts['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in counts.itertuples()])
+            dump_df(counts, rawcountsprefixes[e])
 
         if e.ndsi != NDSIS.noNDSI:
-            logging.info("Calculating NDSIs for experiment %s" % e.name)
-            ctime1 = time.monotonic()
-            groupby, ndsicol, ndsi_byaa, ndsi_bynuc = getNDSI(counts, e.ndsi)
-            ctime2 = time.monotonic()
-            logging.info("Finished calculating NDSIs after %i seconds" % round(ctime2 - ctime1))
+            nspecfile = os.path.join(intermediate_outdir, "nspec.pkl")
+            byaafile = os.path.join(args.outdir, "%sNDSIs_byaa" % prefixes[e])
+            bynucfile = os.path.join(args.outdir, "%sNDSIs_bynuc" % prefixes[e])
 
-            ndsi_byaa.to_csv(os.path.join(args.outdir, "%sNDSIs_byaa.csv" % prefix), index=False, encoding='utf-8')
-            ndsi_bynuc.to_csv(os.path.join(args.outdir, "%sNDSIs_bynuc.csv" % prefix), index=False, encoding='utf-8')
-            if 'named_insert' in counts:
-                seqcol = 'named_insert'
+            nspec = False
+            ndsi_byaa = False
+            ndsi_bynuc = False
+            if args.resume and os.path.isfile(nspecfile):
+                nspec = pickle.load(open(nspecfile, 'r+b'))
+            ndsi_byaa = read_df_if_exists(byaafile)
+            ndsi_bynuc = read_df_if_exists(bynucfile)
+            if nspec is not False and ndsi_byaa is not False and ndsi_bynuc is not False:
+                logging.info("Found NDSI data for experiment %s and resume is requested, continuing" % e.name)
             else:
-                seqcol = 'sequence'
-            plot_profiles(counts, [groupby, seqcol], ndsicol, os.path.join(args.outdir, "%sbynuc_countplots.pdf" % prefix), e.name)
-            plot_profiles(counts.groupby([groupby, ndsicol, 'translation'])['normalized_counts'].sum().reset_index(), [groupby, 'translation'], ndsicol, os.path.join(args.outdir, "%sbyaa_countplots.pdf" % prefix), e.name)
+                args.resume = False
+                nspec = getNDSISpec(e)
+                if nspec:
+                    logging.info("Calculating NDSIs for experiment %s" % e.name)
+                    ctime1 = time.monotonic()
+                    ndsi_byaa, ndsi_bynuc = getNDSI(counts, nspec)
+                    ctime2 = time.monotonic()
+                    logging.info("Finished calculating NDSIs after %i seconds" % round(ctime2 - ctime1))
+
+                    dump_df(ndsi_byaa, os.path.join(args.outdir, "%sNDSIs_byaa" % prefixes[e]))
+                    dump_df(ndsi_bynuc, os.path.join(args.outdir, "%sNDSIs_bynuc" % prefixes[e]))
+                    pickle.dump(nspec, open(nspecfile, 'w+b'), 3)
+                    plot_profiles(counts, [nspec.groupby, nspec.seqcol], nspec.ndsicol, os.path.join(args.outdir, "%sbynuc_countplots.pdf" % prefixes[e]), e.name)
+                    plot_profiles(counts.groupby([nspec.groupby, nspec.ndsicol, 'translation'])['normalized_counts'].sum().reset_index(), [nspec.groupby, 'translation'], nspec.ndsicol, os.path.join(args.outdir, "%sbyaa_countplots.pdf" % prefixes[e]), e.name)
     return 0
