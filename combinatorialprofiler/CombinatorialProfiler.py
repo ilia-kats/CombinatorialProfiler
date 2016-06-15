@@ -277,8 +277,9 @@ def main():
             ndsi_bynuc = False
             if args.resume and os.path.isfile(nspecfile):
                 nspec = pickle.load(open(nspecfile, 'r+b'))
-            ndsi_byaa = read_df_if_exists(byaafile)
-            ndsi_bynuc = read_df_if_exists(bynucfile)
+            if args.resume:
+                ndsi_byaa = read_df_if_exists(byaafile)
+                ndsi_bynuc = read_df_if_exists(bynucfile)
             if nspec is not False and ndsi_byaa is not False and ndsi_bynuc is not False:
                 logging.info("Found NDSI data for experiment %s and resume is requested, continuing" % e.name)
             else:
