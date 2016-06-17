@@ -37,18 +37,26 @@ class NDSISpec(object):
 
 def getNDSISpec(e):
     nspec = NDSISpec()
-    if e.ndsi == NDSIS.noNDSI:
+    if isinstance(e, PyExperiment):
+        ndsi = e.ndsi
+        if len(e.named_inserts):
+            nspec.seqcol = 'named_insert'
+        else:
+            nspec.seqcol = 'sequence'
+    elif isinstance(e, NDSIS):
+        ndsi = e
+    else:
+        raise TypeError("Unsupported type")
+
+    if ndsi == NDSIS.noNDSI:
         return None
-    elif e.ndsi == NDSIS.forward:
+    elif ndsi == NDSIS.forward:
         nspec.groupby = 'barcode_rev'
         nspec.ndsicol = 'barcode_fw'
-    elif e.ndsi == NDSIS.reverse:
+    elif ndsi == NDSIS.reverse:
         nspec.groupby = 'barcode_fw'
         nspec.ndsicol = 'barcode_rev'
-    if len(e.named_inserts):
-        nspec.seqcol = 'named_insert'
-    else:
-        nspec.seqcol = 'sequence'
+
     return nspec
 
 def getNDSI(df, nspec):

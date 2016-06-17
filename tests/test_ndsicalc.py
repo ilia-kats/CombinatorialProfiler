@@ -7,7 +7,7 @@ import pandas as pd
 import Bio.Seq
 import Bio.Alphabet
 
-from combinatorialprofiler.CombinatorialProfiler import normalizeCounts, getNDSI
+from combinatorialprofiler.CombinatorialProfiler import normalizeCounts, getNDSI, getNDSISpec
 from combinatorialprofiler.readcounter import NDSIS
 
 random.seed(42)
@@ -119,7 +119,7 @@ def test_ndsicalc():
     simu = DFCreator()
     ncounts = normalizeCounts(simu.df, simu.sortedcells_df)
     ncounts['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in ncounts.itertuples()])
-    groupby, ndsicol, ndsi_byaa, ndsi_bynuc = getNDSI(ncounts, NDSIS.reverse)
+    ndsi_byaa, ndsi_bynuc = getNDSI(ncounts, getNDSISpec(NDSIS.reverse))
     for ndsi in ndsi_byaa.itertuples():
         assert round(ndsi.median_ndsi, 5) == round(simu.ndsi_aa_median[ndsi.barcode_fw][ndsi.translation], 5)
         assert round(ndsi.pooled_ndsi, 5) == round(simu.ndsi_aa_pooled[ndsi.barcode_fw][ndsi.translation], 5)
