@@ -3,7 +3,7 @@ from io import StringIO
 from pkg_resources import resource_stream
 
 from PyQt5.QtWidgets import QApplication, QWidget, QTableWidgetItem, QStyle, QMessageBox, QFileDialog
-from PyQt5.QtCore import QRegExp, Qt, pyqtRemoveInputHook
+from PyQt5.QtCore import QRegExp, Qt, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator, QRegExpValidator, QIcon
 from PyQt5 import uic
 
@@ -12,6 +12,7 @@ from ..csvio import readCellCounts
 
 class ExperimentWidget(QWidget):
     ui = uic.loadUiType(resource_stream(__name__, "experiment.ui"))
+    valid = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -34,6 +35,7 @@ class ExperimentWidget(QWidget):
         proto.setData(Qt.EditRole, "0.0")
         self.ui.sortedCellsTbl.setItemPrototype(proto)
         self.ui.sortedCellsTbl.setItemDelegate(self.cellsdelegate)
+        self.ui.sortedCellsTbl.cellChanged.connect(self._validChanged)
 
         self.ui.insertSequence.setValidator(QRegExpValidator(QRegExp("^[atcg]+[n]+[atcg]+$", Qt.CaseInsensitive)))
 
@@ -47,6 +49,14 @@ class ExperimentWidget(QWidget):
         self.ui.barcodes_rev.rowAdded.connect(self.revCodeAdded)
         self.ui.barcodes_rev.rowChanged.connect(self.revCodeChanged)
         self.ui.barcodes_rev.rowRemoved.connect(self.revCodeRemoved)
+
+        self.ui.barcodes_fw.valid.connect(self._validChanged)
+        self.ui.barcodes_rev.valid.connect(self._validChanged)
+        self.ui.named_inserts.valid.connect(self._validChanged)
+        self.ui.insertSequence.textChanged.connect(self._validChanged)
+        self.ui.ndsiGrp.toggled.connect(self._validChanged)
+        self.ui.ndsiOnFw.toggled.connect(self._validChanged)
+        self.ui.ndsiOnRev.toggled.connect(self._validChanged)
 
     def fwCodeAdded(self, row, text):
         nrow = self.ui.sortedCellsTbl.rowCount()
@@ -96,6 +106,9 @@ class ExperimentWidget(QWidget):
         elif ncol == 1 and fwcount:
             self.ui.sortedCellsTbl.horizontalHeaderItem(0).setText('')
 
+    def _validChanged(self):
+        self.valid.emit(self.isValid())
+
     def _fromFile(self, f):
         try:
             fwrows, revcols = self.getCellHeaderMapping()
@@ -113,7 +126,7 @@ class ExperimentWidget(QWidget):
                 else:
                     continue
                 item = QTableWidgetItem(self.ui.sortedCellsTbl.itemPrototype())
-                item.setData(Qt.DisplayRole, str(val.iloc[0].values.squeeze()))
+                item.setData(Qt.DisplayRole, str(float(val.iloc[0].values.squeeze())))
                 self.ui.sortedCellsTbl.setItem(y,x, item)
         except BaseException as e:
             QMessageBox.critical(self, "Error", str(e))
@@ -185,3 +198,32 @@ class ExperimentWidget(QWidget):
                 self.ui.ndsiOnFw.setChecked(True)
             elif d['ndsi'] == 'reverse':
                 self.ui.ndsiOnRev.setChecked(True)
+
+    def isValid(self):
+        if not self.ui.barcodes_fw.isValid():
+            print("barcodes_fw")
+            return False
+        if not self.ui.barcodes_rev.isValid():
+            return False
+        if not self.ui.named_inserts.isValid():
+            return False
+        if not self.ui.insertSequence.hasAcceptableInput():
+            return False
+        if self.ui.ndsiGrp.isChecked():
+            if self.ui.ndsiOnFw.isChecked():
+                oloop = self.ui.sortedCellsTbl.columnCount
+                iloop = self.ui.sortedCellsTbl.rowCount
+                coords = lambda o,i: (i, o)
+            else:
+                oloop = self.ui.sortedCellsTbl.rowCount
+                iloop = self.ui.sortedCellsTbl.columnCount
+                coords = lambda o,i: (o, i)
+            for o in range(oloop()):
+                csum = 0.0
+                for i in range(iloop()):
+                    item = self.ui.sortedCellsTbl.item(*coords(o,i))
+                    if item:
+                        csum += float(item.text())
+                if round(csum, 1) != 1:
+                    return False
+        return True

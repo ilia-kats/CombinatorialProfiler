@@ -17,9 +17,13 @@ class TwoColumnWidget(QWidget):
     rowAdded = pyqtSignal(int, 'QString')
     rowRemoved = pyqtSignal(int)
     rowChanged = pyqtSignal(int, 'QString')
+    valid = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.invalid = [0, 0]
+        self.byrow = ({}, {})
+        self.unique = ({}, {})
         self.ui = self.__class__.ui[0]()
         self.ui.setupUi(self)
         style = QApplication.style()
@@ -48,12 +52,23 @@ class TwoColumnWidget(QWidget):
     def addSequence(self, name=None, sequence=None):
         nameitem = QTableWidgetItem(self.ui.seqTbl.itemPrototype())
         seqitem = QTableWidgetItem(self.ui.seqTbl.itemPrototype())
+        nrow = self.ui.seqTbl.rowCount()
         if name:
             nameitem.setText(name)
         if sequence:
             seqitem.setText(sequence)
+        n = nameitem.text()
+        s = seqitem.text()
+        self.byrow[0][nrow] = n
+        self.byrow[1][nrow] = s
+        self.unique[0][n] = self.unique[0].get(n, 0) + 1
+        self.unique[1][s] = self.unique[1].get(s, 0) + 1
 
-        nrow = self.ui.seqTbl.rowCount()
+        if self.unique[0][n] > 1 or not name:
+            self.invalid[0] += 1
+        if self.unique[1][s] > 1 or not sequence:
+            self.invalid[1] += 1
+
         self.ui.seqTbl.insertRow(nrow)
         self.rowAdded.emit(nrow + 1, nameitem.text())
         self.ui.seqTbl.setItem(nrow, 0, nameitem)
@@ -61,6 +76,7 @@ class TwoColumnWidget(QWidget):
         self.ui.seqTbl.setCurrentItem(nameitem)
         if not name:
             self.ui.seqTbl.editItem(nameitem)
+        self.valid.emit(self.isValid())
 
     def _fromFile(self, f):
         try:
@@ -87,13 +103,36 @@ class TwoColumnWidget(QWidget):
         selected = self.ui.seqTbl.selectionModel().selectedRows()
         while len(selected):
             row = selected[-1].row()
+            for col in range(2):
+                self.unique[col][self.byrow[col][row]] -= 1
+                t = self.byrow[col][row]
+                count = self.unique[col][t]
+                del self.byrow[col][row]
+                if count > 0:
+                    self.invalid[col] -= 1
+                if not count:
+                    del self.unique[col][t]
+
             self.ui.seqTbl.removeRow(row)
             self.rowRemoved.emit(row)
             selected = self.ui.seqTbl.selectionModel().selectedRows()
+        self.valid.emit(self.isValid())
 
     def cellChanged(self, row, col):
+        ot = self.byrow[col][row]
+        nt = self.ui.seqTbl.item(row, col).text()
         if col == 0:
-            self.rowChanged.emit(row, self.ui.seqTbl.item(row, col).text())
+            self.rowChanged.emit(row, nt)
+        self.unique[col][ot] -= 1
+        c = self.unique[col].get(nt, 0) + 1
+        self.unique[col][nt] = c
+        oldcount = self.unique[col][ot]
+        if c == 1 and (oldcount > 0 and ot != nt or oldcount == 0 and not ot and nt):
+            self.invalid[col] -= 1
+        if not oldcount:
+            del self.unique[col][self.byrow[col][row]]
+        self.byrow[col][row] = nt
+        self.valid.emit(self.isValid())
 
     def count(self):
         return self.ui.seqTbl.rowCount()
@@ -106,3 +145,6 @@ class TwoColumnWidget(QWidget):
         for k in sorted(d.keys()):
             self.addSequence(k, d[k])
         self.ui.seqTbl.resizeColumnsToContents()
+
+    def isValid(self):
+        return not any(self.invalid)

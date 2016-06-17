@@ -8,7 +8,7 @@ import json
 from pkg_resources import resource_stream
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QListWidgetItem, QTableWidgetItem, QDialogButtonBox, QFileDialog, QMessageBox
-from PyQt5.QtCore import QRegExp, Qt
+from PyQt5.QtCore import QRegExp, Qt, pyqtRemoveInputHook
 from PyQt5.QtGui import QDoubleValidator, QRegExpValidator
 from PyQt5 import uic
 
@@ -23,9 +23,13 @@ class MainWidget(QWidget):
         self.ui = self.__class__.ui[0]()
         self.ui.setupUi(self)
 
-        self.ui.buttonBox.button(QDialogButtonBox.Save).clicked.connect(self.saveClicked)
+        self.savebtn = self.ui.buttonBox.button(QDialogButtonBox.Save)
+        self.savebtn.setEnabled(False)
+        self.savebtn.clicked.connect(self.saveClicked)
         self.ui.buttonBox.button(QDialogButtonBox.Open).clicked.connect(self.openClicked)
         self.ui.buttonBox.button(QDialogButtonBox.Close).clicked.connect(self.closeClicked)
+
+        self.ui.experimentsTab.valid.connect(self.savebtn.setEnabled)
 
     def saveClicked(self):
         dlg = QFileDialog(self)
@@ -67,6 +71,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.widget)
 
 def main():
+    pyqtRemoveInputHook()
     app = QApplication(sys.argv)
     main = MainWindow()
     main.resize(1280, 1024)

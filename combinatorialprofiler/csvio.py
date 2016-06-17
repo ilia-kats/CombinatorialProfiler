@@ -92,5 +92,5 @@ def readCellCounts(f, barcodes_fw=None, barcodes_rev=None):
             raise _unmatchedlabelsexception
 
         toreturn.index.rename(['barcode_fw', 'barcode_rev'], inplace=True)
-    return toreturn.round(5)
+    return toreturn
 
