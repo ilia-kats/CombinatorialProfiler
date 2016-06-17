@@ -42,6 +42,8 @@ public:
 class InsertNode;
 class Node;
 
+UniqueBarcodes makeUnique(const std::unordered_set<std::string>&, uint16_t);
+
 class ReadCounter
 {
 public:

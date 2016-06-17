@@ -10,8 +10,6 @@ import Bio.Alphabet
 from combinatorialprofiler.CombinatorialProfiler import normalizeCounts, getNDSI, getNDSISpec
 from combinatorialprofiler.readcounter import NDSIS
 
-random.seed(42)
-
 class DFCreator:
     nucleotides = ['A', 'T', 'C', 'G']
 
@@ -116,6 +114,7 @@ class DFCreator:
         self.sortedcells_df = pd.Series(counts, index=pd.MultiIndex.from_arrays((barcode_fw, barcode_rev), names=('barcode_fw', 'barcode_rev')))
 
 def test_ndsicalc():
+    random.seed(42)
     simu = DFCreator()
     ncounts = normalizeCounts(simu.df, simu.sortedcells_df)
     ncounts['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in ncounts.itertuples()])

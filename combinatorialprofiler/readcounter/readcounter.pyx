@@ -41,6 +41,8 @@ cdef extern from "cReadCounter.h" nogil:
         SortedCellCounts sortedCells
         Counts counts
 
+    UniqueBarcodes makeUnique(unordered_set[string], uint16_t)
+
     cdef cppclass ReadCounter:
         ReadCounter(vector[Experiment*], uint16_t mismatches, uint16_t unique_barcode_length) except+
         void countReads(const string&, const string&, int)
@@ -188,6 +190,11 @@ cdef class PyExperiment:
     def counts(self):
         return self._exprmnt.counts
 
+def make_unique(barcodes, int minlength=0):
+    cdef unordered_set[string] codes;
+    for c in barcodes:
+        codes.insert(c.encode())
+    return makeUnique(codes, minlength);
 
 cdef class PyReadCounter:
     cdef ReadCounter *_rdcntr
