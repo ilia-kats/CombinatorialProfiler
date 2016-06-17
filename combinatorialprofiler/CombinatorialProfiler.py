@@ -106,15 +106,15 @@ def exec_with_logging(args, pname, out=None, err=None):
         logging.error("%s with returncode %i" % (infostr, ret))
     return ret
 
-def plot_profiles(df, groupby, ndsicol, filename, experiment):
+def plot_profiles(df, groupby, nspec, filename, experiment):
     logging.info("Plotting read count profiles for experiment %s into %s" % (experiment, filename))
     ctime1 = time.monotonic()
-    labels = sorted(df[ndsicol].cat.categories)
+    labels = sorted(df[nspec.ndsicol].cat.categories)
     integer_map = dict([(val, i) for i, val in enumerate(labels)])
     with PdfPages(filename) as pdf:
         for (code, seq), group in df.groupby(groupby):
             fig = plt.figure(figsize=(5,3))
-            plot = plt.plot(group[ndsicol].map(integer_map), group['normalized_counts'], 'ko-')
+            plot = plt.plot(group[nspec.ndsicol].map(integer_map), group['normalized_counts'], 'k.-')
             plt.xlim(0, len(labels) - 1)
             plt.ylim(ymin=0)
             plt.xticks(range(len(labels)), labels)
@@ -124,6 +124,28 @@ def plot_profiles(df, groupby, ndsicol, filename, experiment):
             plt.close()
     ctime2 = time.monotonic()
     logging.info("Finished plotting read count profiles after %i seconds" % round(ctime2 - ctime1))
+
+def plot_correlations(df, nspec, limits, filename, experiment):
+    logging.info("Plotting NDSI correlations for experiment %s into %s" % (experiment, filename))
+    ctime1 = time.monotonic()
+    with PdfPages(filename) as pdf:
+        for code, group in df.groupby(nspec.groupby):
+            c = group['median_ndsi'].corr(group['pooled_ndsi'], method='spearman')
+
+            fig = plt.figure(figsize=(5,5))
+            ax = fig.add_subplot(111)
+            ax.scatter(group['median_ndsi'], group['pooled_ndsi'], s=100, c="#000000", alpha=1/3, marker='.', edgecolor='none')
+            ax.set_xlim(*limits)
+            ax.set_ylim(*limits)
+            ax.set_title(code)
+            ax.set_xlabel("median NDSI")
+            ax.set_ylabel("pooled NDSI")
+            ax.text(0.1, 0.9, "Spearman's $r = %.3g$" % c, transform=ax.transAxes)
+            ax.set_aspect('equal', adjustable='box', anchor='C')
+            pdf.savefig(bbox_inches='tight')
+            plt.close()
+    ctime2 = time.monotonic()
+    logging.info("Finished plotting NDSI correlations after %i seconds" % round(ctime2 - ctime1))
 
 def dump_df(df, prefix):
     df.to_csv(prefix + '.csv', index=False, encoding='utf-8', float_format="%.10f")
@@ -295,6 +317,9 @@ def main():
                     dump_df(ndsi_byaa, os.path.join(args.outdir, "%sNDSIs_byaa" % prefixes[e]))
                     dump_df(ndsi_bynuc, os.path.join(args.outdir, "%sNDSIs_bynuc" % prefixes[e]))
                     pickle.dump(nspec, open(nspecfile, 'w+b'), 3)
-                    plot_profiles(counts, [nspec.groupby, nspec.seqcol], nspec.ndsicol, os.path.join(args.outdir, "%sbynuc_countplots.pdf" % prefixes[e]), e.name)
-                    plot_profiles(counts.groupby([nspec.groupby, nspec.ndsicol, 'translation'])['normalized_counts'].sum().reset_index(), [nspec.groupby, 'translation'], nspec.ndsicol, os.path.join(args.outdir, "%sbyaa_countplots.pdf" % prefixes[e]), e.name)
+            if nspec:
+                plot_profiles(counts, [nspec.groupby, nspec.seqcol], nspec, os.path.join(args.outdir, "%sbynuc_countplots.pdf" % prefixes[e]), e.name)
+                plot_profiles(counts.groupby([nspec.groupby, nspec.ndsicol, 'translation'])['normalized_counts'].sum().reset_index(), [nspec.groupby, 'translation'], nspec, os.path.join(args.outdir, "%sbyaa_countplots.pdf" % prefixes[e]), e.name)
+
+                plot_correlations(ndsi_byaa, nspec, (1, counts[nspec.ndsicol].cat.categories.size), os.path.join(args.outdir, "%sNDSIs_byaa_cor.pdf" % prefixes[e]), e.name)
     return 0
