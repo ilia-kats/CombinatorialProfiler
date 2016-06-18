@@ -510,7 +510,7 @@ std::unordered_map<std::string, UniqueBarcodes> ReadCounter::uniqueReverseBarcod
 
 void ReadCounter::readFile(const std::string &file, ThreadSynchronization *sync)
 {
-    auto in = std::ifstream(file);
+    std::ifstream in(file);
     std::array<std::string, 4> read;
     std::unique_lock<std::mutex> qlock(sync->inqueuemutex, std::defer_lock);
     sync->eof = false;

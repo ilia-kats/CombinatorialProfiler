@@ -105,7 +105,7 @@ def exec_with_logging(args, pname, out=None, err=None):
     else:
         errf = sys.stderr
     ctime1 = time.monotonic()
-    ret = subprocess.run(args, stdout=outf, stderr=errf).returncode
+    ret = subprocess.call(args, stdout=outf, stderr=errf)
     ctime2 = time.monotonic()
     infostr = "%s finished after %i seconds" % (pname, round(ctime2 - ctime1))
     if not ret:
@@ -178,7 +178,7 @@ def main():
     parser.add_argument('--fastqc', required=False, default='fastqc', help='Path to the fastq executable. If not given, fastqc will be assumed to be in PATH')
     parser.add_argument('--bowtie', required=False, default='bowtie2', help='Path to the bowtie2 executable. If not given, bowtie2 will be assumed to be in PATH')
     parser.add_argument('--phix_index', required=True, help='Path to the bowtie index of the PhiX genome.')
-    parser.add_argument('--pear', required=True, help='Path to the PEAR binary. If not given, pear will be assumed to be in PATH')
+    parser.add_argument('--pear', required=False, default='pear', help='Path to the PEAR binary. If not given, pear will be assumed to be in PATH')
     parser.add_argument('-t', '--threads', required=False, default=1, help='Number of threads to use',  type=int)
     parser.add_argument('-c', '--configuration', required=True, help='JSON configuration file.')
     parser.add_argument('-r', '--resume', required=False, action='store_true', help='Resume aborted run? If intermediate files are found, they will be reused instead.')
@@ -209,7 +209,7 @@ def main():
     os.makedirs(fqcoutdir, exist_ok=True)
     if not args.resume or not os.path.isdir(fqcoutdir):
         args.resume = False
-        if exec_with_logging([args.fastqc, '--outdir=%s' % fqcoutdir, *args.fastq], "fastqc"):
+        if exec_with_logging([args.fastqc, '--outdir=%s' % fqcoutdir] + list(args.fastq), "fastqc"):
             return 1
     else:
         logging.info("Found fastqc output and resume is requested, continuing")
