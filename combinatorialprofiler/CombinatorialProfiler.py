@@ -113,11 +113,11 @@ def exec_with_logging(args, pname, out=None, err=None):
     ctime1 = time.monotonic()
     ret = subprocess.call(args, stdout=outf, stderr=errf)
     ctime2 = time.monotonic()
-    infostr = "%s finished after %i seconds" % (pname, round(ctime2 - ctime1))
+    infostr = "%s finished after %d seconds" % (pname, round(ctime2 - ctime1))
     if not ret:
         logging.info(infostr)
     else:
-        logging.error("%s with returncode %i" % (infostr, ret))
+        logging.error("%s with returncode %d" % (infostr, ret))
     return ret
 
 def plot_profiles(df, groupby, nspec, filename, experiment):
@@ -140,7 +140,7 @@ def plot_profiles(df, groupby, nspec, filename, experiment):
             pdf.savefig(bbox_inches='tight')
             plt.close()
     ctime2 = time.monotonic()
-    logging.info("Finished plotting read count profiles after %i seconds" % round(ctime2 - ctime1))
+    logging.info("Finished plotting read count profiles after %d seconds" % round(ctime2 - ctime1))
 
 def plot_correlations(df, nspec, limits, filename, experiment):
     logging.info("Plotting NDSI correlations for experiment %s into %s" % (experiment, filename))
@@ -162,7 +162,7 @@ def plot_correlations(df, nspec, limits, filename, experiment):
             pdf.savefig(bbox_inches='tight')
             plt.close()
     ctime2 = time.monotonic()
-    logging.info("Finished plotting NDSI correlations after %i seconds" % round(ctime2 - ctime1))
+    logging.info("Finished plotting NDSI correlations after %d seconds" % round(ctime2 - ctime1))
 
 def dump_df(df, prefix):
     df.to_csv(prefix + '.csv', index=False, encoding='utf-8', float_format="%.10f")
@@ -289,7 +289,10 @@ def main():
         ctime1 = time.monotonic()
         counter.countReads(os.path.join(intermediate_outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped"), args.threads)
         ctime2 = time.monotonic()
-        logging.info("Finished counting reads after %i seconds" % round(ctime2 - ctime1))
+        logging.info("Finished counting reads after %d seconds" % round(ctime2 - ctime1))
+        logging.info("{:,d} total reads".format(counter.read))
+        logging.info("{:,d} counted reads".format(counter.counted))
+        logging.info("{:,d} unmatched reads, thereof {:,d} reads that could not be matched to an insert, {:,d} reads without a barcode, {:,d} reads that could not be matched to a named insert".format(counter.unmatched_total, counter.unmatched_insert, counter.unmatched_barcodes, counter.unmatched_insert_sequence))
         logging.debug("Unique forward barcodes: %s" % json.dumps(counter.unique_forward_barcodes, indent=4))
         logging.debug("Unique reverse barcodes: %s" % json.dumps(counter.unique_reverse_barcodes, indent=4))
 
@@ -328,7 +331,7 @@ def main():
                     ctime1 = time.monotonic()
                     ndsi_byaa, ndsi_bynuc = getNDSI(counts, nspec)
                     ctime2 = time.monotonic()
-                    logging.info("Finished calculating NDSIs after %i seconds" % round(ctime2 - ctime1))
+                    logging.info("Finished calculating NDSIs after %d seconds" % round(ctime2 - ctime1))
 
                     dump_df(ndsi_byaa, os.path.join(args.outdir, "%sNDSIs_byaa" % prefixes[e]))
                     dump_df(ndsi_bynuc, os.path.join(args.outdir, "%sNDSIs_bynuc" % prefixes[e]))
