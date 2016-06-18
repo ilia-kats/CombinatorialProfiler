@@ -1,5 +1,5 @@
 import sys
-if sys.version < '3.5':
+if sys.version < '3.4':
   print('Unsupported Python version: {0:s}.'.format(sys.version))
   print('Supported Python versions are 3.5 or a later 3.x version.')
   sys.exit(1)
@@ -33,7 +33,7 @@ class debugmode(develop):
 
 setup(name='CombinatorialProfiler',
     packages=['combinatorialprofiler'],
-    install_requires=['numpy', 'scipy', 'pandas', 'matplotlib', 'biopython'],
+    install_requires=['numpy', 'scipy', 'pandas>=0.15', 'matplotlib', 'biopython'],
     entry_points={
         'console_scripts': ['CombinatorialProfiler=combinatorialprofiler.CombinatorialProfiler:main'],
         'gui_scripts':['CombinatorialProfilerGUI=combinatorialprofiler.ui.CProfilerGUI:main']

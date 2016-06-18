@@ -14,6 +14,8 @@ import pandas as pd
 import numpy as np
 import matplotlib as mpl
 mpl.use('PDF')
+mpl.rcParams['pdf.fonttype'] = 42
+mpl.rcParams['ps.fonttype'] = 42
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 
@@ -60,7 +62,7 @@ def getNDSISpec(e):
     return nspec
 
 def getNDSI(df, nspec):
-    statsfuns = ['min', 'max', 'mean', 'median', 'std', 'sum', ('nfractions', 'size')]
+    statsfuns = ['min', 'max', 'mean', 'median', 'std', 'sum']
 
     fractionvals = pd.Series(range(1, df[nspec.ndsicol].cat.categories.size + 1), index=sorted(df[nspec.ndsicol].cat.categories))
 
@@ -75,6 +77,7 @@ def getNDSI(df, nspec):
     byseq.name = 'ndsi'
     byseq_stats = g.agg({'counts': statsfuns, 'normalized_counts': statsfuns})
     byseq_stats.columns = ['_'.join(col) for col in byseq_stats.columns.values]
+    byseq_stats['nfractions'] = g.agg('size')
 
     byaa_median = byseq.groupby(level=groupbyl + ['translation']).median().dropna()
     byaa_median.name = 'median_ndsi'
@@ -82,8 +85,11 @@ def getNDSI(df, nspec):
     g = df.groupby(groupbyl + ['translation'])
     byaa_pooled = (g['normalized_counts_cells'].sum() / g['normalized_counts'].sum()).dropna()
     byaa_pooled.name = 'pooled_ndsi'
+
     byaa_stats = g.agg({'counts': statsfuns, 'normalized_counts': statsfuns})
     byaa_stats.columns = ['_'.join(col) for col in byaa_stats.columns.values]
+    byaa_stats['nfractions'] = g[nspec.ndsicol].nunique()
+
     return (pd.concat((byaa_median, byaa_pooled, byaa_stats), axis=1).reset_index().dropna(subset=('median_ndsi', 'pooled_ndsi')), pd.concat((byseq, byseq_stats), axis=1).reset_index().dropna(subset=['ndsi']))
 
 class PyExperimentJSONEncoder(json.JSONEncoder):
@@ -122,7 +128,10 @@ def plot_profiles(df, groupby, nspec, filename, experiment):
     with PdfPages(filename) as pdf:
         for (code, seq), group in df.groupby(groupby):
             fig = plt.figure(figsize=(5,3))
-            plot = plt.plot(group[nspec.ndsicol].map(integer_map), group['normalized_counts'], 'k.-')
+
+            xvals = group[nspec.ndsicol].map(integer_map)
+            xorder = xvals.argsort()
+            plot = plt.plot(xvals.iloc[xorder], group['normalized_counts'].iloc[xorder], 'k.-')
             plt.xlim(0, len(labels) - 1)
             plt.ylim(ymin=0)
             plt.xticks(range(len(labels)), labels)
@@ -172,6 +181,8 @@ def main():
     import argparse
     import difflib
 
+    rawargs = " ".join(sys.argv)
+
     parser = argparse.ArgumentParser(description='Process paired-end Illumina MiSeq reads for combinatorial degron profiling')
     parser.add_argument('fastq', nargs=2, help='Two FASTQ files containing the forward and reverse reads, respectively')
     parser.add_argument('-o', '--outdir', required=False, default=os.getcwd(), help='Output directory')
@@ -187,10 +198,10 @@ def main():
     args = parser.parse_args()
 
     os.makedirs(args.outdir, exist_ok=True)
-    logging.basicConfig(filename=os.path.join(args.outdir, 'run_log.txt'), filemode='w', format='%(levelname)s:%(asctime)s:%(message)s', level=getattr(logging, args.log_level))
+    logging.basicConfig(filename=os.path.join(args.outdir, 'log.txt'), filemode='w', format='%(levelname)s:%(asctime)s:%(message)s', level=getattr(logging, args.log_level))
 
     logging.info("%s version %s" % (parser.prog, version))
-    logging.info(" ".join(sys.argv))
+    logging.info(rawargs)
 
     # do this right away to make the user immediately aware of any exceptions that might occur due to
     # a malformed config file
@@ -271,13 +282,12 @@ def main():
         rawcountsprefixes[e] = os.path.join(args.outdir, "%sraw_counts" % prefixes[e])
         if not read_df_if_exists(rawcountsprefixes[e], False):
             have_counts = False
-            break
 
     if args.resume and have_counts:
         logging.info("Found raw counts for all experiments and resume is requested, continuing")
     else:
         args.resume = False
-        logging.info("Starting counting reads")
+        logging.info("Counting reads")
         ctime1 = time.monotonic()
         counter.countReads(os.path.join(intermediate_outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped"), args.threads)
         ctime2 = time.monotonic()
