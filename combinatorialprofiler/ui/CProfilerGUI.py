@@ -27,9 +27,28 @@ class MainWidget(QWidget):
         self.savebtn.setEnabled(False)
         self.savebtn.clicked.connect(self.saveClicked)
         self.ui.buttonBox.button(QDialogButtonBox.Open).clicked.connect(self.openClicked)
-        self.ui.buttonBox.button(QDialogButtonBox.Close).clicked.connect(self.closeClicked)
+        self.ui.buttonBox.button(QDialogButtonBox.Close).clicked.connect(self.close)
+        self.saved = True
 
         self.ui.experimentsTab.valid.connect(self.savebtn.setEnabled)
+        self.ui.experimentsTab.valid.connect(self.changed)
+        self.ui.settingsTab.changed.connect(self.changed)
+
+    def changed(self):
+        self.saved = False
+
+    def canQuit(self):
+        if not self.saved:
+            btn = QMessageBox.question(self, "Close now?", "The current configuration has not been saved. Quit anyway?", defaultButton = QMessageBox.No)
+            if btn == QMessageBox.No:
+                return False
+            else:
+                return True
+        else:
+            return True
+
+    def close(self):
+        QApplication.activeWindow().close()
 
     def saveClicked(self):
         dlg = QFileDialog(self)
@@ -43,6 +62,7 @@ class MainWidget(QWidget):
                 d = self.ui.settingsTab.serialize()
                 d['experiments'] = self.ui.experimentsTab.serialize()
                 json.dump(d, f, indent=4)
+            self.saved = True
 
     def openClicked(self):
         dlg = QFileDialog(self)
@@ -57,11 +77,9 @@ class MainWidget(QWidget):
                     d = json.load(f)
                     self.ui.settingsTab.unserialize(d)
                     self.ui.experimentsTab.unserialize(d['experiments'])
+                self.saved = True
             except BaseException as e:
                 QMessageBox.critical(self, "Error", str(e))
-
-    def closeClicked(self):
-        QApplication.exit()
 
 
 class MainWindow(QMainWindow):
@@ -69,6 +87,12 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.widget = MainWidget(parent)
         self.setCentralWidget(self.widget)
+
+    def closeEvent(self, e):
+        if not self.widget.canQuit():
+            e.ignore()
+        else:
+            super().closeEvent(e)
 
 def main():
     pyqtRemoveInputHook()
