@@ -251,7 +251,7 @@ def main():
 
     if not args.resume or not os.path.isfile(bowtieout) or not os.path.isfile(bowtiesam) or not os.path.isfile(bowtiemetrics) or not os.path.isfile(fqnames[0]) or not os.path.isfile(fqnames[1]):
         args.resume = False
-        if exec_with_logging([args.bowtie, '-p', str(args.threads), '--local', '--un-conc', bowtiefqname, '-x', args.phix_index, '-1', args.fastq[0], '-2', args.fastq[1], '-S', bowtiesam, '--met-file', bowtiemetrics], "bowtie2", err=bowtieout):
+        if exec_with_logging([args.bowtie, '-p', str(args.threads), '--local', '--un-conc', bowtiefqname, '-x', args.phix_index, '-1', args.fastq[0], '-2', args.fastq[1], '-S', bowtiesam, '--no-unal', '--met-file', bowtiemetrics], "bowtie2", err=bowtieout):
             return 1
     else:
         logging.info("Found bowtie2 output and resume is requested, continuing")
