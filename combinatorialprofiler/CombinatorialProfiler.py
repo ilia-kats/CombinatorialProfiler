@@ -181,14 +181,12 @@ def main():
     import argparse
     import difflib
 
-    rawargs = " ".join(sys.argv)
-
     parser = argparse.ArgumentParser(description='Process paired-end Illumina MiSeq reads for combinatorial degron profiling')
     parser.add_argument('fastq', nargs=2, help='Two FASTQ files containing the forward and reverse reads, respectively')
     parser.add_argument('-o', '--outdir', required=False, default=os.getcwd(), help='Output directory')
     parser.add_argument('--fastqc', required=False, default='fastqc', help='Path to the fastq executable. If not given, fastqc will be assumed to be in PATH')
     parser.add_argument('--bowtie', required=False, default='bowtie2', help='Path to the bowtie2 executable. If not given, bowtie2 will be assumed to be in PATH')
-    parser.add_argument('--phix_index', required=True, help='Path to the bowtie index of the PhiX genome.')
+    parser.add_argument('--phix-index', required=True, help='Path to the bowtie index of the PhiX genome.')
     parser.add_argument('--pear', required=False, default='pear', help='Path to the PEAR binary. If not given, pear will be assumed to be in PATH')
     parser.add_argument('-t', '--threads', required=False, default=1, help='Number of threads to use',  type=int)
     parser.add_argument('-c', '--configuration', required=True, help='JSON configuration file.')
@@ -201,7 +199,7 @@ def main():
     logging.basicConfig(filename=os.path.join(args.outdir, 'log.txt'), filemode='w', format='%(levelname)s:%(asctime)s:%(message)s', level=getattr(logging, args.log_level))
 
     logging.info("%s version %s" % (parser.prog, version))
-    logging.info(rawargs)
+    logging.info(" ".join(sys.argv))
 
     # do this right away to make the user immediately aware of any exceptions that might occur due to
     # a malformed config file
