@@ -137,14 +137,14 @@ public:
     std::string sequence;
 
 protected:
-    static std::pair<std::string::size_type, uint16_t> fuzzy_find(const std::string &needle, const std::string &haystack)
+    static std::pair<std::string::size_type, uint16_t> fuzzy_find(const std::string &needle, const std::string &haystack, int startpos = 0)
     {
         auto totest = haystack.size() - needle.size();
         std::vector<uint16_t> mismatches(totest, UINT16_MAX);
         auto mit = mismatches.begin();
         bool haveZeroMismatches = false;
         size_t zeroMismatchPos;
-        for (size_t i = 0; i < totest; ++i, ++mit) {
+        for (size_t i = startpos; i < totest; ++i, ++mit) {
             *mit = std::inner_product(needle.cbegin(),
                                       needle.cend(),
                                       haystack.cbegin() + i,
@@ -257,10 +257,10 @@ public:
                 if (upstream.second > m_mismatches)
                     return false;
             }
-            auto downstream = fuzzy_find(m_downstreamseq, read.getSequence());
+            start = upstream.first + m_upstreamseq.size();
+            auto downstream = fuzzy_find(m_downstreamseq, read.getSequence(), start);
             if (downstream.second + upstream.second > m_mismatches)
                 return false;
-            start = upstream.first + m_upstreamseq.size();
             end = downstream.first;
         } else {
             start = read.getSequence().find(m_upstreamseq);
@@ -270,10 +270,10 @@ public:
                 if (start == decltype(m_upstreamseq)::npos)
                     return false;
             }
-            end = read.getSequence().find(m_downstreamseq);
+             start += m_upstreamseq.size();
+            end = read.getSequence().find(m_downstreamseq, start);
             if (end == decltype(m_downstreamseq)::npos)
                 return false;
-            start += m_upstreamseq.size();
         }
 
         if (end - start != m_insertlength)
