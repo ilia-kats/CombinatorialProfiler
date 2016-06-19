@@ -341,4 +341,5 @@ def main():
                 plot_profiles(counts.groupby([nspec.groupby, nspec.ndsicol, 'translation'])['normalized_counts'].sum().reset_index(), [nspec.groupby, 'translation'], nspec, os.path.join(args.outdir, "%sbyaa_countplots.pdf" % prefixes[e]), e.name)
 
                 plot_correlations(ndsi_byaa, nspec, (1, counts[nspec.ndsicol].cat.categories.size), os.path.join(args.outdir, "%sNDSIs_byaa_cor.pdf" % prefixes[e]), e.name)
+                plot_correlations(ndsi_byaa[~ndsi_byaa['translation'].str.contains('*', regex=False)], nspec, (1, counts[nspec.ndsicol].cat.categories.size), os.path.join(args.outdir, "%sNDSIs_byaa_cor_nostop.pdf" % prefixes[e]), e.name)
     return 0
