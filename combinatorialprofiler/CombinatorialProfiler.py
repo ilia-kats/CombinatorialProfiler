@@ -195,6 +195,8 @@ def main():
     parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + version, help='Print version and exit')
     args = parser.parse_args()
 
+    starttime = time.monotonic()
+
     os.makedirs(args.outdir, exist_ok=True)
     logging.basicConfig(filename=os.path.join(args.outdir, 'log.txt'), filemode='w', format='%(levelname)s:%(asctime)s:%(message)s', level=getattr(logging, args.log_level))
 
@@ -211,8 +213,6 @@ def main():
         logging.debug(json.dumps(exp, indent=4, cls=PyExperimentJSONEncoder))
 
     counter = PyReadCounter(experiments, config.get('insert_mismatches', 0), config.get('barcode_length', 0))
-
-    stime = time.monotonic()
 
     fqcoutdir = os.path.join(args.outdir,'fastqc')
     os.makedirs(fqcoutdir, exist_ok=True)
@@ -342,4 +342,6 @@ def main():
 
                 plot_correlations(ndsi_byaa, nspec, (1, counts[nspec.ndsicol].cat.categories.size), os.path.join(args.outdir, "%sNDSIs_byaa_cor.pdf" % prefixes[e]), e.name)
                 plot_correlations(ndsi_byaa[~ndsi_byaa['translation'].str.contains('*', regex=False)], nspec, (1, counts[nspec.ndsicol].cat.categories.size), os.path.join(args.outdir, "%sNDSIs_byaa_cor_nostop.pdf" % prefixes[e]), e.name)
+    stoptime = time.monotonic()
+    logging.info("%s finished after %.2f hours" % (parser.prog, (stoptime - starttime) / 3600))
     return 0
