@@ -7,13 +7,15 @@ import json
 
 from pkg_resources import resource_stream
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QListWidgetItem, QTableWidgetItem, QDialogButtonBox, QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QListWidgetItem, QTableWidgetItem, QDialogButtonBox, QFileDialog, QMessageBox, QStyle
 from PyQt5.QtCore import QRegExp, Qt, pyqtRemoveInputHook
 from PyQt5.QtGui import QDoubleValidator, QRegExpValidator
 from PyQt5 import uic
 
 from .experimentswidget import ExperimentsWidget
 from .experimentwidget import ExperimentWidget
+
+from combinatorialprofiler import version
 
 class MainWidget(QWidget):
     ui = uic.loadUiType(resource_stream(__name__, "main.ui"))
@@ -23,14 +25,21 @@ class MainWidget(QWidget):
         self.ui = self.__class__.ui[0]()
         self.ui.setupUi(self)
 
-        self.savebtn = self.ui.buttonBox.button(QDialogButtonBox.Save)
-        self.savebtn.setEnabled(False)
-        self.savebtn.clicked.connect(self.saveClicked)
-        self.ui.buttonBox.button(QDialogButtonBox.Open).clicked.connect(self.openClicked)
-        self.ui.buttonBox.button(QDialogButtonBox.Close).clicked.connect(self.close)
+        style = QApplication.style()
+        self.ui.saveBtn.setIcon(style.standardIcon(QStyle.SP_DialogSaveButton))
+        self.ui.openBtn.setIcon(style.standardIcon(QStyle.SP_DialogOpenButton))
+        self.ui.closeBtn.setIcon(style.standardIcon(QStyle.SP_DialogCloseButton))
+        self.ui.aboutBtn.setIcon(style.standardIcon(QStyle.SP_MessageBoxInformation))
+
+        self.ui.saveBtn.setEnabled(False)
+        self.ui.saveBtn.clicked.connect(self.saveClicked)
+        self.ui.openBtn.clicked.connect(self.openClicked)
+        self.ui.closeBtn.clicked.connect(self.close)
         self.saved = True
 
-        self.ui.experimentsTab.valid.connect(self.savebtn.setEnabled)
+        self.ui.aboutBtn.clicked.connect(self.about)
+
+        self.ui.experimentsTab.valid.connect(self.ui.saveBtn.setEnabled)
         self.ui.experimentsTab.valid.connect(self.changed)
         self.ui.settingsTab.changed.connect(self.changed)
 
@@ -49,6 +58,9 @@ class MainWidget(QWidget):
 
     def close(self):
         QApplication.activeWindow().close()
+
+    def about(self):
+        QMessageBox.information(self, "About", """%s version %s.""" % (QApplication.applicationName(), version))
 
     def saveClicked(self):
         dlg = QFileDialog(self)
