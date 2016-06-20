@@ -14,8 +14,7 @@ from PyQt5 import uic
 
 from .experimentswidget import ExperimentsWidget
 from .experimentwidget import ExperimentWidget
-
-from combinatorialprofiler import version
+from .aboutdialog import AboutDialog
 
 class MainWidget(QWidget):
     ui = uic.loadUiType(resource_stream(__name__, "main.ui"))
@@ -60,7 +59,7 @@ class MainWidget(QWidget):
         QApplication.activeWindow().close()
 
     def about(self):
-        QMessageBox.information(self, "About", """%s version %s.""" % (QApplication.applicationName(), version))
+        AboutDialog(self).exec()
 
     def saveClicked(self):
         dlg = QFileDialog(self)
