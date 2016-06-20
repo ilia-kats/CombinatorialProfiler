@@ -1,7 +1,7 @@
 import sys
 if sys.version < '3.4':
   print('Unsupported Python version: {0:s}.'.format(sys.version))
-  print('Supported Python versions are 3.5 or a later 3.x version.')
+  print('Supported Python versions are 3.4 or a later 3.x version.')
   sys.exit(1)
 
 
@@ -31,27 +31,39 @@ class debugmode(develop):
         readcounter = cythonize(readcounter)
 
 
-setup(name='CombinatorialProfiler',
-    packages=['combinatorialprofiler'],
-    install_requires=['numpy', 'scipy', 'pandas>=0.15', 'matplotlib', 'biopython'],
-    entry_points={
-        'console_scripts': ['CombinatorialProfiler=combinatorialprofiler.CombinatorialProfiler:main'],
-        'gui_scripts':['CombinatorialProfilerGUI=combinatorialprofiler.ui.CProfilerGUI:main']
-    },
-    package_data={
-        '': ['*.ui']
-    },
-    ext_modules = [readcounter],
-    cmdclass={
-        'develop': debugmode
-    },
-    zip_safe = True,
-    setup_requires=['pytest-runner'],
-    tests_require=['pytest'],
+def run_setup(with_binary=True):
+    entry_points = {
+            'gui_scripts':['CombinatorialProfilerGUI=combinatorialprofiler.ui.CProfilerGUI:main']
+        }
 
-    version=version,
-    description='Pipeline for analysis of combinatorial stability profiling data',
-    author="Ilia Kats",
-    author_email="i.kats@zmbh.uni-heidelberg.de",
-    license="GPLv2"
-)
+    if with_binary:
+        kw = dict(setup_requires=['pytest_runner'], tests_require=['pytest'], ext_modules=[readcounter], entry_points=entry_points)
+        entry_points['console_scripts'] = ['CombinatorialProfiler=combinatorialprofiler.CombinatorialProfiler:main']
+    else:
+        kw = {}
+    setup(name='CombinatorialProfiler',
+        packages=['combinatorialprofiler'],
+        install_requires=['numpy', 'scipy', 'pandas>=0.15', 'matplotlib', 'biopython'],
+        package_data={
+            '': ['*.ui']
+        },
+        cmdclass={
+            'develop': debugmode
+        },
+        zip_safe = True,
+        version=version,
+        description='Pipeline for analysis of combinatorial stability profiling data',
+        author="Ilia Kats",
+        author_email="i.kats@zmbh.uni-heidelberg.de",
+        license="GPLv2",
+        **kw
+    )
+
+try:
+    run_setup(True)
+except BaseException as e:
+    print('*' * 75)
+    print(e)
+    print('The readcounter extension could not be compiled. Only the GUI will be installed.')
+    print('*' * 75)
+    run_setup(False)
