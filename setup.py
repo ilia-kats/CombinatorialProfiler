@@ -5,7 +5,7 @@ if sys.version < '3.4':
   sys.exit(1)
 
 
-from setuptools import setup
+from setuptools import setup, find_packages
 from setuptools.extension import Extension
 from setuptools.command.develop import develop
 
@@ -42,7 +42,7 @@ def run_setup(with_binary=True):
     else:
         kw = {}
     setup(name='CombinatorialProfiler',
-        packages=['combinatorialprofiler'],
+        packages=find_packages(exclude=['test', 'tests']),
         install_requires=['numpy', 'scipy', 'pandas>=0.15', 'matplotlib', 'biopython'],
         package_data={
             '': ['*.ui']
