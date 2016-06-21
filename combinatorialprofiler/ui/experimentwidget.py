@@ -201,7 +201,6 @@ class ExperimentWidget(QWidget):
 
     def isValid(self):
         if not self.ui.barcodes_fw.isValid():
-            print("barcodes_fw")
             return False
         if not self.ui.barcodes_rev.isValid():
             return False

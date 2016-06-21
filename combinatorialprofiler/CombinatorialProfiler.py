@@ -184,7 +184,7 @@ def main():
     import argparse
     import difflib
 
-    parser = argparse.ArgumentParser(description='Process paired-end Illumina MiSeq reads for combinatorial degron profiling')
+    parser = argparse.ArgumentParser(description='Process paired-end Illumina reads for combinatorial degron profiling')
     parser.add_argument('fastq', nargs='*', help='FASTQ files containing the reads to process. If more than two FASTQ files are given, every two consecutive files are assumed to contained paired-end reads and will be processed together. Read counts from all files will be aggregated for NDSI calculation.')
     parser.add_argument('-o', '--outdir', required=False, default=os.getcwd(), help='Output directory')
     parser.add_argument('--fastqc', required=False, default='fastqc', help='Path to the fastq executable. If not given, fastqc will be assumed to be in PATH')

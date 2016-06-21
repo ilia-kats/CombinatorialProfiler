@@ -25,13 +25,5 @@ class AboutDialog(QDialog):
         self.ui.okBtn.setIcon(style.standardIcon(QStyle.SP_DialogOkButton))
         self.ui.aboutText.setText("%s version %s." % (QApplication.applicationName(), version))
 
-        size = style.pixelMetric(QStyle.PM_MessageBoxIconSize, None, self)
-        win = self.windowHandle()
-        if not win:
-            wid = self.nativeParentWidget()
-            if wid:
-                win = wid.windowHandle()
-        self.ui.aboutIcon.setPixmap(style.standardIcon(QStyle.SP_MessageBoxInformation).pixmap(win, QSize(size, size)))
-
         logosize = self.ui.aboutText.fontMetrics().width(self.ui.aboutText.text())
         self.ui.knoplabLogo.setPixmap(QIcon(":/knoplablogo.svg").pixmap(logosize, logosize))
