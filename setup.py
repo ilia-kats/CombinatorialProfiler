@@ -37,10 +37,11 @@ def run_setup(with_binary=True):
         }
 
     if with_binary:
-        kw = dict(setup_requires=['pytest_runner'], tests_require=['pytest'], ext_modules=[readcounter], entry_points=entry_points)
+        kw = dict(setup_requires=['pytest_runner'], tests_require=['pytest'], ext_modules=[readcounter])
         entry_points['console_scripts'] = ['CombinatorialProfiler=combinatorialprofiler.CombinatorialProfiler:main']
     else:
         kw = {}
+    kw['entry_points'] = entry_points
     setup(name='CombinatorialProfiler',
         packages=find_packages(exclude=['test', 'tests']),
         install_requires=['numpy', 'scipy', 'pandas>=0.15', 'matplotlib', 'biopython'],
