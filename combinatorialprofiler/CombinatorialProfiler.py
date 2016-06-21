@@ -177,12 +177,15 @@ def read_df_if_exists(prefix, read=True):
     else:
         return False
 
+class InvalidArgumentException(BaseException):
+    pass
+
 def main():
     import argparse
     import difflib
 
     parser = argparse.ArgumentParser(description='Process paired-end Illumina MiSeq reads for combinatorial degron profiling')
-    parser.add_argument('fastq', nargs=2, help='Two FASTQ files containing the forward and reverse reads, respectively')
+    parser.add_argument('fastq', nargs='*', help='FASTQ files containing the reads to process. If more than two FASTQ files are given, every two consecutive files are assumed to contained paired-end reads and will be processed together. Read counts from all files will be aggregated for NDSI calculation.')
     parser.add_argument('-o', '--outdir', required=False, default=os.getcwd(), help='Output directory')
     parser.add_argument('--fastqc', required=False, default='fastqc', help='Path to the fastq executable. If not given, fastqc will be assumed to be in PATH')
     parser.add_argument('--bowtie', required=False, default='bowtie2', help='Path to the bowtie2 executable. If not given, bowtie2 will be assumed to be in PATH')
@@ -203,6 +206,10 @@ def main():
     logging.info("%s version %s" % (parser.prog, version))
     logging.info(" ".join(sys.argv))
 
+    if len(args.fastq) % 2:
+        logging.error("Uneven number of FASTQ files given, I don't know what to do. Aborting.")
+        raise InvalidArgumentException("Uneven number of FASTQ files")
+
     # do this right away to make the user immediately aware of any exceptions that might occur due to
     # a malformed config file
     config = json.load(open(args.configuration))
@@ -213,88 +220,91 @@ def main():
         logging.debug(json.dumps(exp, indent=4, cls=PyExperimentJSONEncoder))
 
     counter = PyReadCounter(experiments, config.get('insert_mismatches', 0), config.get('barcode_length', 0))
+    logging.debug("Unique forward barcodes: %s" % json.dumps(counter.unique_forward_barcodes, indent=4))
+    logging.debug("Unique reverse barcodes: %s" % json.dumps(counter.unique_reverse_barcodes, indent=4))
 
     fqcoutdir = os.path.join(args.outdir,'fastqc')
     os.makedirs(fqcoutdir, exist_ok=True)
-    if not args.resume or not os.path.isdir(fqcoutdir):
-        args.resume = False
-        if exec_with_logging([args.fastqc, '--outdir=%s' % fqcoutdir] + list(args.fastq), "fastqc"):
-            return 1
-    else:
-        logging.info("Found fastqc output and resume is requested, continuing")
-
     intermediate_outdir = os.path.join(args.outdir, 'intermediates')
     os.makedirs(intermediate_outdir, exist_ok=True)
-    fqnames = None
-    bowtiefqname = None
-    mergedfqname = None
-    fastq = [os.path.basename(fq) for fq in args.fastq]
-    if len(fastq[0]) == len(fastq[1]):
-        s = difflib.SequenceMatcher(a=fastq[0], b=fastq[1])
-        if s.ratio() >= 2 * (len(fastq[0]) - 1) / (2 * len(fastq[0])):
-            b = s.get_matching_blocks()
-            if len(b) == 2:
-                b.prepend((0,0,0))
-            template = '%s{0}%s' % (fastq[0][b[0][0]:b[0][0]+b[0][2]], fastq[0][b[1][0]:b[1][0]+b[1][2]])
-            fqnames = [os.path.join(intermediate_outdir, template.format(i)) for i in range(1,3)]
-            bowtiefqname = os.path.join(intermediate_outdir, template.format('%'))
-            mergedfqname = fastq[0][b[0][0]:b[0][0]+b[0][2]]
 
-    if not fqnames:
-        fqnames = [os.path.join(intermediate_outdir, 'sequence_%d.fastq' % i) for i in range(1,3)]
-        bowtiefqname = os.path.join(intermediate_outdir, 'sequence_%.fastq')
-        mergedfqname = 'sequence'
-
-    bowtieout = os.path.join(intermediate_outdir, 'phix_alignment_summary.txt')
-    bowtiesam = os.path.join(intermediate_outdir, 'phix_alignment.sam')
-    bowtiemetrics = os.path.join(intermediate_outdir, 'phix_alignment_metrics.txt')
-
-    if not args.resume or not os.path.isfile(bowtieout) or not os.path.isfile(bowtiesam) or not os.path.isfile(bowtiemetrics) or not os.path.isfile(fqnames[0]) or not os.path.isfile(fqnames[1]):
-        args.resume = False
-        if exec_with_logging([args.bowtie, '-p', str(args.threads), '--local', '--un-conc', bowtiefqname, '-x', args.phix_index, '-1', args.fastq[0], '-2', args.fastq[1], '-S', bowtiesam, '--no-unal', '--met-file', bowtiemetrics], "bowtie2", err=bowtieout):
-            return 1
-    else:
-        logging.info("Found bowtie2 output and resume is requested, continuing")
-
-    mergedfqpath = os.path.join(intermediate_outdir, mergedfqname)
-    mergedfqname += '.assembled.fastq'
-    pearout = os.path.join(intermediate_outdir, 'pear_summary.txt')
-    if not args.resume or not os.path.isfile(pearout) or not os.path.isfile(os.path.join(intermediate_outdir, mergedfqname)):
-        args.resume = False
-        if exec_with_logging([args.pear, '-j', str(args.threads), '-f', fqnames[0], '-r', fqnames[1], '-o', mergedfqpath], "PEAR", out=pearout):
-            return 1
-    else:
-        logging.info("Found PEAR output and resume is requested, continuing")
-
-    unmatcheddir = os.path.join(args.outdir, "%s_unmapped" % mergedfqname)
-    os.makedirs(unmatcheddir, exist_ok=True)
-
-    prefixes = {}
-    rawcountsprefixes = {}
-    have_counts = True
-    for e in experiments:
-        if not len(e.name):
-            prefixes[e] = ''
+    for fw, rev in zip(args.fastq[::2], args.fastq[1::2]):
+        logging.info("Processing FASTQ pair %s and %s" % (fw, rev))
+        if not args.resume or not os.path.isfile(os.path.join(fqcoutdir, os.path.splitext(os.path.basename(fw))[0]) + "_fastqc.html") or not os.path.isfile(os.path.join(fqcoutdir, os.path.splitext(os.path.basename(rev))[0]) + "_fastqc.html"):
+            args.resume = False
+            if exec_with_logging([args.fastqc, '--outdir=%s' % fqcoutdir] + [fw, rev], "fastqc"):
+                return 1
         else:
-            prefixes[e] = "%s_" % e.name
-        rawcountsprefixes[e] = os.path.join(args.outdir, "%sraw_counts" % prefixes[e])
-        if not read_df_if_exists(rawcountsprefixes[e], False):
-            have_counts = False
+            logging.info("Found fastqc output and resume is requested, continuing")
 
-    if args.resume and have_counts:
-        logging.info("Found raw counts for all experiments and resume is requested, continuing")
-    else:
-        args.resume = False
-        logging.info("Counting reads")
-        ctime1 = time.monotonic()
-        counter.countReads(os.path.join(intermediate_outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped"), args.threads)
-        ctime2 = time.monotonic()
-        logging.info("Finished counting reads after %d seconds" % round(ctime2 - ctime1))
-        logging.info("{:,d} total reads".format(counter.read))
-        logging.info("{:,d} counted reads".format(counter.counted))
-        logging.info("{:,d} unmatched reads, thereof {:,d} reads that could not be matched to an insert, {:,d} reads without a barcode, {:,d} reads that could not be matched to a named insert".format(counter.unmatched_total, counter.unmatched_insert, counter.unmatched_barcodes, counter.unmatched_insert_sequence))
-        logging.debug("Unique forward barcodes: %s" % json.dumps(counter.unique_forward_barcodes, indent=4))
-        logging.debug("Unique reverse barcodes: %s" % json.dumps(counter.unique_reverse_barcodes, indent=4))
+        fqnames = None
+        bowtiefqname = None
+        mergedfqname = None
+        fastq = [os.path.basename(fq) for fq in (fw, rev)]
+        if len(fastq[0]) == len(fastq[1]):
+            s = difflib.SequenceMatcher(a=fastq[0], b=fastq[1])
+            if s.ratio() >= 2 * (len(fastq[0]) - 1) / (2 * len(fastq[1])):
+                b = s.get_matching_blocks()
+                if len(b) == 2:
+                    b.prepend((0,0,0))
+                template = '%s{0}%s' % (fastq[0][b[0][0]:b[0][0]+b[0][2]], fastq[0][b[1][0]:b[1][0]+b[1][2]])
+                fqnames = [os.path.join(intermediate_outdir, template.format(i)) for i in range(1,3)]
+                bowtiefqname = os.path.join(intermediate_outdir, template.format('%'))
+                mergedfqname = fastq[0][b[0][0]:b[0][0]+b[0][2]]
+
+        if not fqnames:
+            fqnames = [os.path.join(intermediate_outdir, 'sequence_%d.fastq' % i) for i in range(1,3)]
+            bowtiefqname = os.path.join(intermediate_outdir, 'sequence_%.fastq')
+            mergedfqname = 'sequence'
+
+        bowtieout = os.path.join(intermediate_outdir, 'phix_alignment_summary.txt')
+        bowtiesam = os.path.join(intermediate_outdir, 'phix_alignment.sam')
+        bowtiemetrics = os.path.join(intermediate_outdir, 'phix_alignment_metrics.txt')
+
+        if not args.resume or not os.path.isfile(bowtieout) or not os.path.isfile(bowtiesam) or not os.path.isfile(bowtiemetrics) or not os.path.isfile(fqnames[0]) or not os.path.isfile(fqnames[1]):
+            args.resume = False
+            if exec_with_logging([args.bowtie, '-p', str(args.threads), '--local', '--un-conc', bowtiefqname, '-x', args.phix_index, '-1', fw, '-2', rev, '-S', bowtiesam, '--no-unal', '--met-file', bowtiemetrics], "bowtie2", err=bowtieout):
+                return 1
+        else:
+            logging.info("Found bowtie2 output and resume is requested, continuing")
+
+        mergedfqpath = os.path.join(intermediate_outdir, mergedfqname)
+        mergedfqname += '.assembled.fastq'
+        pearout = os.path.join(intermediate_outdir, 'pear_summary.txt')
+        if not args.resume or not os.path.isfile(pearout) or not os.path.isfile(os.path.join(intermediate_outdir, mergedfqname)):
+            args.resume = False
+            if exec_with_logging([args.pear, '-j', str(args.threads), '-f', fqnames[0], '-r', fqnames[1], '-o', mergedfqpath], "PEAR", out=pearout):
+                return 1
+        else:
+            logging.info("Found PEAR output and resume is requested, continuing")
+
+        unmatcheddir = os.path.join(args.outdir, "%s_unmapped" % mergedfqname)
+        os.makedirs(unmatcheddir, exist_ok=True)
+
+        prefixes = {}
+        rawcountsprefixes = {}
+        have_counts = True
+        for e in experiments:
+            if not len(e.name):
+                prefixes[e] = ''
+            else:
+                prefixes[e] = "%s_" % e.name
+            rawcountsprefixes[e] = os.path.join(args.outdir, "%sraw_counts" % prefixes[e])
+            if not read_df_if_exists(rawcountsprefixes[e], False):
+                have_counts = False
+
+        if args.resume and have_counts:
+            logging.info("Found raw counts for all experiments and resume is requested, continuing")
+        else:
+            args.resume = False
+            logging.info("Counting reads")
+            ctime1 = time.monotonic()
+            counter.countReads(os.path.join(intermediate_outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped"), args.threads)
+            ctime2 = time.monotonic()
+            logging.info("Finished counting reads after %d seconds" % round(ctime2 - ctime1))
+            logging.info("{:,d} total reads".format(counter.read))
+            logging.info("{:,d} counted reads".format(counter.counted))
+            logging.info("{:,d} unmatched reads, thereof {:,d} reads that could not be matched to an insert, {:,d} reads without a barcode, {:,d} reads that could not be matched to a named insert".format(counter.unmatched_total, counter.unmatched_insert, counter.unmatched_barcodes, counter.unmatched_insert_sequence))
 
     for e in experiments:
         if args.resume and have_counts:
