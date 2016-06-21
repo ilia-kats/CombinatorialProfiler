@@ -119,7 +119,7 @@ Experiment::Experiment()
 Experiment::Experiment(std::string n)
 : name(std::move(n)), ndsi(NDSIS::noNDSI)
 {}
-
+#include <iostream>
 class Node
 {
 public:
@@ -137,16 +137,16 @@ public:
     std::string sequence;
 
 protected:
-    static std::pair<std::string::size_type, uint16_t> fuzzy_find(const std::string &needle, const std::string &haystack, size_t startpos = 0)
+    static std::pair<std::string::size_type, uint16_t> fuzzy_find(const std::string &needle, const std::string &haystack, std::string::size_type startpos = 0)
     {
         auto totest = haystack.size() - needle.size();
-        if (totest <= startpos)
+        if (totest < startpos)
             return std::make_pair(0, UINT16_MAX);
-        std::vector<uint16_t> mismatches(totest - startpos, UINT16_MAX);
+        std::vector<uint16_t> mismatches(totest - startpos + 1, UINT16_MAX);
         auto mit = mismatches.begin();
         bool haveZeroMismatches = false;
-        size_t zeroMismatchPos;
-        for (size_t i = startpos; i < totest; ++i, ++mit) {
+        std::string::size_type zeroMismatchPos;
+        for (std::string::size_type i = startpos; i <= totest; ++i, ++mit) {
             *mit = std::inner_product(needle.cbegin(),
                                       needle.cend(),
                                       haystack.cbegin() + i,
