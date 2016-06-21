@@ -66,7 +66,7 @@ def getNDSI(df, nspec):
 
     fractionvals = pd.Series(range(1, df[nspec.ndsicol].cat.categories.size + 1), index=sorted(df[nspec.ndsicol].cat.categories))
 
-    df['normalized_counts_cells'] = df.set_index(nspec.ndsicol, append=True)['normalized_counts'].mul(fractionvals, level=1).reset_index(level=1, drop=True)
+    df['normalized_counts_cells'] = df.set_index(nspec.ndsicol, append=True)['normalized_counts'].mul(fractionvals, level=nspec.ndsicol).reset_index(level=nspec.ndsicol, drop=True)
 
     groupbyl = ['experiment', nspec.groupby]
     if 'named_insert' in df.columns:
