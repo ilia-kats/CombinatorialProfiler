@@ -219,7 +219,7 @@ def main():
         experiments.append(exp)
         logging.debug(json.dumps(exp, indent=4, cls=PyExperimentJSONEncoder))
 
-    counter = PyReadCounter(experiments, config.get('insert_mismatches', 0), config.get('barcode_length', 0))
+    counter = PyReadCounter(experiments, config.get('insert_mismatches', 0), config.get('barcode_length', 0), config.get('barcode_mismatches', 0))
     logging.debug("Unique forward barcodes: %s" % json.dumps(counter.unique_forward_barcodes, indent=4))
     logging.debug("Unique reverse barcodes: %s" % json.dumps(counter.unique_reverse_barcodes, indent=4))
 

@@ -10,6 +10,7 @@
 #include <condition_variable>
 #include <atomic>
 #include <thread>
+#include <cmath>
 
 #include <cassert>
 
@@ -123,13 +124,83 @@ Experiment::Experiment(std::string n)
 class Node
 {
 public:
+class MatchBase
+{
+public:
+    MatchBase(const Node *n)
+    : m_node(n), m_match(true) {}
+    MatchBase(const Node *n, bool m)
+    : m_node(n), m_match(m) {}
+    virtual ~MatchBase() {}
+
+    operator bool() const
+    {
+        return m_match;
+    }
+
+    const Node* node()
+    {
+        return m_node;
+    }
+
+protected:
+    const Node *m_node;
+    bool m_match;
+};
+
+template<typename T>
+class Match : public MatchBase
+{
+public:
+    virtual ~Match() {}
+
+    friend bool operator<(const Match<T> &l, const Match<T> &r)
+    {
+        if (l and !r)
+            return true;
+        else if (r and !l)
+            return false;
+        else
+            return l.m_mismatches < r.m_mismatches;
+    }
+    friend bool operator>(const Match &l, const Match &r)
+    {
+        return r < l;
+    }
+    friend bool operator<=(const Match &l, const Match &r)
+    {
+        return !(l > r);
+    }
+    friend bool operator>=(const Match &l, const Match &r)
+    {
+        return !(l < r);
+    }
+    friend bool operator==(const Match &l, const Match &r)
+    {
+        return l.match && r.match && l.m_calcBackMismatches == r.m_calcBackMismatches;
+    }
+    friend bool operator!=(const Match &l, const Match &r)
+    {
+        return !(l == r);
+    }
+
+protected:
+    Match(const Node *n, bool m)
+    : MatchBase(n, m), m_mismatches(0) {}
+
+    Match(const Node *n, bool m, T mismatches)
+    : MatchBase(n, m), m_mismatches(mismatches) {}
+
+    T m_mismatches;
+};
+
     Node() : experiment(nullptr) {}
-    Node(std::string seq)
-    : experiment(nullptr), sequence(std::move(seq)) {}
+    Node(std::string seq, std::string::size_type mismatches = 0)
+    : experiment(nullptr), sequence(std::move(seq)), m_allowedMismatches(mismatches) {}
 
     virtual ~Node() {}
 
-    virtual bool match(Read&, std::string *s=nullptr) const = 0;
+    virtual MatchBase* match(Read&) const = 0;
 
     Experiment *experiment;
 
@@ -137,52 +208,66 @@ public:
     std::string sequence;
 
 protected:
-    static std::pair<std::string::size_type, uint16_t> fuzzy_find(const std::string &needle, const std::string &haystack, std::string::size_type startpos = 0)
+    std::string::size_type m_allowedMismatches;
+
+    template<class NeedleIt, class HaystackIt>
+    static std::pair<std::string::size_type, std::string::size_type> fuzzy_find(NeedleIt nbegin, NeedleIt nend, HaystackIt hbegin, HaystackIt hend)
     {
-        auto totest = haystack.size() - needle.size();
-        if (totest < startpos)
+        auto hsize = std::distance(hbegin, hend);
+        auto nsize = std::distance(nbegin, nend);
+        auto totest = hsize - nsize + 1;
+        if (totest <= 0)
             return std::make_pair(0, UINT16_MAX);
-        std::vector<uint16_t> mismatches(totest - startpos + 1, UINT16_MAX);
-        auto mit = mismatches.begin();
-        bool haveZeroMismatches = false;
-        std::string::size_type zeroMismatchPos;
-        for (std::string::size_type i = startpos; i <= totest; ++i, ++mit) {
-            *mit = std::inner_product(needle.cbegin(),
-                                      needle.cend(),
-                                      haystack.cbegin() + i,
-                                      static_cast<decltype(mismatches)::value_type>(0),
-                                      std::plus<decltype(mismatches)::value_type>(),
-                                      [](const std::remove_reference<decltype(needle)>::type::value_type &n, const std::remove_reference<decltype(haystack)>::type::value_type &h) -> bool {return static_cast<bool>(n ^ h);});
-            if (!*mit) {
-                haveZeroMismatches = true;
-                zeroMismatchPos = i;
-                break;
+        std::pair<std::string::size_type, std::string::size_type> bestMatch(0, SIZE_MAX);
+        for (std::string::size_type i = 0; i < totest; ++i) {
+            auto mm = std::inner_product(nbegin,
+                                         nend,
+                                         hbegin + i,
+                                         static_cast<std::string::size_type>(0),
+                                         std::plus<std::string::size_type>(),
+                                         [](const typename decltype(nbegin)::value_type &n, const typename decltype(hbegin)::value_type &h) -> bool {return static_cast<bool>(n ^ h);});
+            if (mm < bestMatch.second) {
+                bestMatch.first = i;
+                bestMatch.second = mm;
             }
+            if (!mm)
+                break;
         }
-        if (haveZeroMismatches)
-            return std::make_pair(zeroMismatchPos, 0);
-        else {
-            auto bestmatch = std::min_element(mismatches.cbegin(), mismatches.cend());
-            return std::make_pair(std::distance(mismatches.cbegin(), bestmatch) + startpos, *bestmatch);
-        }
+        return bestMatch;
     }
 };
-
 
 class BarcodeNode : public Node
 {
 public:
-    BarcodeNode() : Node(dummykey) {}
+class BarcodeMatch : public Match<float>
+{
+public:
+    BarcodeMatch(const BarcodeNode *n, std::string::size_type length, std::string::size_type mismatches)
+    : Match(n, false, (float)mismatches * (float)n->sequence.size() / (float)length), m_matchedLength(length), m_actualMismatches(mismatches)
+    {
+        if (m_mismatches > n->m_allowedMismatches)
+            m_match = false;
+        else
+            m_match = true;
+    }
+
+private:
+    std::string::size_type m_matchedLength;
+    std::string::size_type m_actualMismatches;
+};
+
+    BarcodeNode() : Node(dummykey, 0) {}
     virtual ~BarcodeNode() {}
 
-    virtual bool match(Read &rd, std::string *s=nullptr) const
+    virtual BarcodeMatch* match(Read &rd) const
     {
-        return true;
+        return new BarcodeMatch(this, SIZE_MAX, 0);
     }
 
 protected:
-    BarcodeNode(std::string seq, std::vector<std::string> uniqueseq)
-    : Node(std::move(seq)), m_uniqueSequences(std::move(uniqueseq))
+    BarcodeNode(std::string seq, std::vector<std::string> uniqueseq, std::string::size_type mismatches=0)
+    : Node(std::move(seq), mismatches), m_uniqueSequences(std::move(uniqueseq))
     {}
 
     std::vector<std::string> m_uniqueSequences;
@@ -192,23 +277,37 @@ class RevBarcodeNode : public BarcodeNode
 {
 public:
     RevBarcodeNode() : BarcodeNode() {}
-    RevBarcodeNode(std::string fullseq, std::vector<std::string> uniqueSeqs)
-    : BarcodeNode(std::move(fullseq), std::move(uniqueSeqs))
+    RevBarcodeNode(std::string fullseq, std::vector<std::string> uniqueSeqs, std::string::size_type mismatches=0)
+    : BarcodeNode(std::move(fullseq), std::move(uniqueSeqs), mismatches)
     {
         for (auto &s : m_uniqueSequences) {
             s = revCompl(s);
         }
     }
 
-    virtual bool match(Read &rd, std::string *s=nullptr) const
+    virtual BarcodeMatch* match(Read &rd) const
     {
         auto rdseq = rd.getSequence();
-        for (const auto &seq : m_uniqueSequences) {
-            if (!rdseq.compare(rdseq.size() - seq.size(), seq.size(), seq)) {
-                return true;
+        std::pair<decltype(m_uniqueSequences)::size_type, std::string::size_type> bestFind(SIZE_MAX, SIZE_MAX);
+        if (!m_allowedMismatches) {
+            for (const auto &seq : m_uniqueSequences) {
+                if (!rdseq.compare(rdseq.size() - seq.size(), seq.size(), seq)) {
+                    return new BarcodeMatch(this, seq.size(), 0);
+                }
+            }
+        } else {
+            auto it = m_uniqueSequences.cbegin();
+            for (decltype(m_uniqueSequences)::size_type i = 0; i < m_uniqueSequences.size(); ++i, ++it) {
+                auto found = fuzzy_find(it->cbegin(), it->cend(), rdseq.cend() - it->size(), rdseq.cend());
+                if (found.second < bestFind.second) {
+                    bestFind.first = i;
+                    bestFind.second = found.second;
+                }
+                if (!found.second)
+                    break;
             }
         }
-        return false;
+        return new BarcodeMatch(this, m_uniqueSequences[bestFind.first].size(), bestFind.second);
     }
 };
 
@@ -216,27 +315,59 @@ class FwBarcodeNode : public BarcodeNode
 {
 public:
     FwBarcodeNode() : BarcodeNode() {}
-    FwBarcodeNode(std::string fullseq, std::vector<std::string> uniqueSeqs)
-    : BarcodeNode(std::move(fullseq), std::move(uniqueSeqs))
+    FwBarcodeNode(std::string fullseq, std::vector<std::string> uniqueSeqs, std::string::size_type mismatches=0)
+    : BarcodeNode(std::move(fullseq), std::move(uniqueSeqs), mismatches)
     {}
 
-    virtual bool match(Read &rd, std::string *s=nullptr) const
+    virtual BarcodeMatch* match(Read &rd) const
     {
-        for (const auto &seq : m_uniqueSequences) {
-            auto rdseq = rd.getSequence();
-            if (!rdseq.compare(0, seq.size(), seq)) {
-                return true;
+        auto rdseq = rd.getSequence();
+        std::pair<decltype(m_uniqueSequences)::size_type, std::string::size_type> bestFind(SIZE_MAX, SIZE_MAX);
+        if (!m_allowedMismatches){
+            for (const auto &seq : m_uniqueSequences) {
+                if (!rdseq.compare(0, seq.size(), seq)) {
+                    return new BarcodeMatch(this, seq.size(), 0);
+                }
+            }
+        } else {
+            auto it = m_uniqueSequences.cbegin();
+            for (decltype(m_uniqueSequences)::size_type i = 0; i < m_uniqueSequences.size(); ++i, ++it) {
+                auto found = fuzzy_find(it->cbegin(), it->cend(), rdseq.cbegin(), rdseq.cbegin() + it->size());
+                if (found.second < bestFind.second) {
+                    bestFind.first = i;
+                    bestFind.second = found.second;
+                }
+                if (!found.second)
+                    break;
             }
         }
-        return false;
+        return new BarcodeMatch(this, m_uniqueSequences[bestFind.first].size(), bestFind.second);
     }
 };
 
 class InsertNode : public Node
 {
 public:
-    InsertNode(std::string seq, uint16_t mismatches = 1)
-    : Node(std::move(seq)), m_mismatches(mismatches)
+class InsertMatch : public Match<std::string::size_type>
+{
+public:
+    InsertMatch(const InsertNode *n, std::string::size_type mismatches, std::string insert = std::string())
+    : Match(n, mismatches <= n->m_allowedMismatches, mismatches), m_insert(std::move(insert)) {}
+
+    InsertMatch(const InsertNode *n, bool match)
+    : Match(n, match) {}
+
+    const std::string& insertSequence() const
+    {
+        return m_insert;
+    }
+
+private:
+    std::string m_insert;
+};
+
+    InsertNode(std::string seq, std::string::size_type mismatches = 1)
+    : Node(std::move(seq), mismatches)
     {
         // Currently assuming there is only one insert sequence
         auto insert_start = sequence.find_first_of("Nn");
@@ -248,21 +379,24 @@ public:
         m_downstreamseq = sequence.substr(insert_end + 1, std::string::npos);
     }
 
-    bool match(Read &read, std::string *insert=nullptr) const
+    virtual InsertMatch* match(Read &read) const
     {
         decltype(m_upstreamseq)::size_type start, end;
-        if (m_mismatches > 0) {
-            auto upstream = fuzzy_find(m_upstreamseq, read.getSequence());
-            if (upstream.second > m_mismatches) {
+        std::string::size_type mismatches_cnt = 0;
+        if (m_allowedMismatches > 0) {
+            auto upstream = fuzzy_find(m_upstreamseq.cbegin(), m_upstreamseq.cend(), read.getSequence().cbegin(), read.getSequence().cend());
+            if (upstream.second > m_allowedMismatches) {
                 read = read.reverseComplement();
-                upstream = fuzzy_find(m_upstreamseq, read.getSequence());
-                if (upstream.second > m_mismatches)
-                    return false;
+                upstream = fuzzy_find(m_upstreamseq.cbegin(), m_upstreamseq.cend(), read.getSequence().cbegin(), read.getSequence().cend());
+                if (upstream.second > m_allowedMismatches)
+                    return new InsertMatch(this, upstream.second);
             }
             start = upstream.first + m_upstreamseq.size();
-            auto downstream = fuzzy_find(m_downstreamseq, read.getSequence(), start);
-            if (downstream.second + upstream.second > m_mismatches)
-                return false;
+            auto downstream = fuzzy_find(m_downstreamseq.cbegin(), m_downstreamseq.cend(), read.getSequence().cbegin() + start, read.getSequence().cend());
+            downstream.first += start;
+            mismatches_cnt = downstream.second + upstream.second;
+            if (mismatches_cnt > m_allowedMismatches)
+                return new InsertMatch(this, mismatches_cnt);
             end = downstream.first;
         } else {
             start = read.getSequence().find(m_upstreamseq);
@@ -270,30 +404,27 @@ public:
                 read = read.reverseComplement();
                 start = read.getSequence().find(m_upstreamseq);
                 if (start == decltype(m_upstreamseq)::npos)
-                    return false;
+                    return new InsertMatch(this, false);
             }
             start += m_upstreamseq.size();
             end = read.getSequence().find(m_downstreamseq, start);
             if (end == decltype(m_downstreamseq)::npos)
-                return false;
+                return new InsertMatch(this, false);
         }
 
         if (end - start != m_insertlength)
-            return false;
+            return new InsertMatch(this, false);
 
-        if (insert) {
-            insert->clear();
-            auto it = read.getSequence().cbegin();
-            std::copy(it + start, it + end, std::inserter(*insert, insert->begin()));
-        }
-        return true;
+        std::string insert;
+        auto it = read.getSequence().cbegin();
+        std::copy(it + start, it + end, std::inserter(insert, insert.begin()));
+        return new InsertMatch(this, mismatches_cnt, std::move(insert));
     }
-private:
-    uint16_t m_mismatches;
 
+private:
     std::string m_upstreamseq;
     std::string m_downstreamseq;
-    uint16_t m_insertlength;
+    std::string::size_type m_insertlength;
 };
 
 UniqueBarcodes makeUnique(const std::unordered_set<std::string> &codes, uint16_t minlength)
@@ -320,8 +451,8 @@ UniqueBarcodes makeUnique(const std::unordered_set<std::string> &codes, uint16_t
     return uniqueCodes;
 }
 
-ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_mismatches, uint16_t unique_barcode_length)
-: m_allowedMismatches(insert_mismatches), m_uniqueBarcodeLength(unique_barcode_length), m_read(0), m_counted(0), m_unmatchedTotal(0), m_unmatchedInsert(0), m_unmatchedBarcodes(0), m_unmatchedInsertSequence(0), m_written(0), m_experiments(experiments)
+ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_mismatches, uint16_t unique_barcode_length, uint16_t allowed_barcode_mismatches)
+: m_allowedMismatches(insert_mismatches), m_uniqueBarcodeLength(unique_barcode_length), m_allowedBarcodeMismatches(allowed_barcode_mismatches), m_read(0), m_counted(0), m_unmatchedTotal(0), m_unmatchedInsert(0), m_unmatchedBarcodes(0), m_unmatchedInsertSequence(0), m_written(0), m_experiments(experiments)
 {
     std::unordered_map<std::string, std::unordered_set<std::string>> fwCodes;
     std::unordered_map<std::string, std::unordered_set<std::string>> revCodes;
@@ -353,7 +484,7 @@ ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_m
     for (const auto &exp : m_experiments) {
         std::vector<BarcodeNode*> revNodes;
         for (const auto &c : exp->revBarcodeSet) {
-            BarcodeNode *n = new RevBarcodeNode(c.first, m_uniqueRevCodes[exp->insert][c.first]);
+            BarcodeNode *n = new RevBarcodeNode(c.first, m_uniqueRevCodes[exp->insert][c.first], m_allowedBarcodeMismatches);
             n->experiment = exp;
             revNodes.push_back(n);
             m_nodes.push_back(n);
@@ -361,7 +492,7 @@ ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_m
 
         for (const auto &c : exp->fwBarcodeSet) {
             if (!fwNodes[exp->insert].count(c.first)) {
-                BarcodeNode *n = new FwBarcodeNode(c.first, m_uniqueFwCodes[exp->insert][c.first]);
+                BarcodeNode *n = new FwBarcodeNode(c.first, m_uniqueFwCodes[exp->insert][c.first], m_allowedBarcodeMismatches);
                 fwNodes[exp->insert][c.first] = n;
                 m_nodes.push_back(n);
                 inserts[exp->insert]->children.push_back(n);
@@ -411,9 +542,9 @@ struct ReadCounter::ThreadSynchronization
         enum class Fail {noFail, insertFailed, barcodeFailed, insertMatchFailed};
         Read read;
         Fail fail;
-        std::vector<const Node*> nodes;
+        std::vector<Node::MatchBase*> nodes;
 
-        FailedMatch(Read r, Fail f, std::vector<const Node*> ns)
+        FailedMatch(Read r, Fail f, std::vector<Node::MatchBase*> ns)
         : read(std::move(r)), fail(f), nodes(std::move(ns))
         {}
     };
@@ -463,6 +594,11 @@ uint16_t ReadCounter::allowedMismatches() const
 uint16_t ReadCounter::minimumUniqueBarcodeLength() const
 {
     return m_uniqueBarcodeLength;
+}
+
+uint16_t ReadCounter::allowedBarcodeMismatches() const
+{
+    return m_allowedBarcodeMismatches;
 }
 
 uint64_t ReadCounter::read() const
@@ -556,11 +692,11 @@ void ReadCounter::writeReads(const std::string &prefix, ThreadSynchronization *s
         else if (fmatch.fail == ThreadSynchronization::FailedMatch::Fail::barcodeFailed) {
             fname.push_back("noBarcodeForInsert");
             for (const auto &n : fmatch.nodes)
-                fname.push_back(n->sequence);
+                fname.push_back(n->node()->sequence);
         }
         if (fmatch.fail == ThreadSynchronization::FailedMatch::Fail::insertMatchFailed) {
             fname.push_back("noNamedInsertForExperiment");
-            fname.push_back(fmatch.nodes.back()->experiment->name);
+            fname.push_back(fmatch.nodes.back()->node()->experiment->name);
         }
         auto it = fname.cbegin();
         std::string outfname = *it++;
@@ -572,6 +708,8 @@ void ReadCounter::writeReads(const std::string &prefix, ThreadSynchronization *s
             files[outfname].open(outfname, std::ios_base::ate);
         files[outfname] << fmatch.read.getName() << std::endl << fmatch.read.getSequence() << std::endl << fmatch.read.getDescription() << std::endl << fmatch.read.getQuality() << std::endl;
         ++m_written;
+        for (auto &n : fmatch.nodes)
+            delete n;
     }
 }
 
@@ -609,38 +747,54 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
         sync->inqueuefull.notify_one();
 
         ThreadSynchronization::FailedMatch::Fail fail = ThreadSynchronization::FailedMatch::Fail::noFail;
-        std::vector<const Node*> nodes;
+        std::vector<Node::MatchBase*> nodes;
 
         std::string ins;
-        const Node *cn = nullptr;
+        InsertNode::InsertMatch *in = nullptr;
         for (const auto &n : m_tree) {
-            if (n->match(rd, &ins)) {
-                cn = n;
+            InsertNode::InsertMatch *cn = n->match(rd);
+            if (*cn) {
+                nodes.push_back(cn);
+                in = cn;
                 break;
             }
+            else
+                delete cn;
         }
-        if (cn) {
-            nodes.push_back(cn);
-            while (!cn->experiment && cn->children.size()) {
-                bool found = false;
-                for (const auto &n : cn->children) {
-                    if (n->match(rd)) {
-                        cn = n;
-                        nodes.push_back(n);
-                        found = true;
+        if (in && *in) {
+            Node::MatchBase *cn = in;
+            while (!cn->node()->experiment && cn->node()->children.size()) {
+                Node::MatchBase *best = nullptr;
+                for (const auto &n : cn->node()->children) {
+                    Node::MatchBase *bn = n->match(rd);
+                    if (*bn && best && *bn < *best) {
+                        delete best;
+                        best = bn;
                         break;
-                    }
+                    } else if (*bn && !best) {
+                        best = bn;
+                    } else
+                        delete bn;
                 }
-                if (!found)
+                if (best && *best) {
+                    nodes.push_back(best);
+                    cn = best;
+                } else {
+                    if (best)
+                        delete best;
                     break;
+                }
             }
-            if (cn->experiment) {
-                if (nodes.size() != 3)
+            if (cn->node()->experiment) {
+                if (nodes.size() != 3) {
+                    for (auto &n : nodes)
+                        delete n;
                     throw std::logic_error("Unexpected number of tree levels: " + std::to_string(nodes.size()));
+                }
 
                 // using exact sequence matching at the moment, maybe add option for mismatches?
-                if (!cn->experiment->namedInserts.size() || cn->experiment->namedInserts.count(ins))
-                    ++localcounts[cn->experiment][std::make_pair(cn->experiment->fwBarcodeSet[nodes[1]->sequence], cn->experiment->revBarcodeSet[nodes[2]->sequence])][ins];
+                if (!cn->node()->experiment->namedInserts.size() || cn->node()->experiment->namedInserts.count(in->insertSequence()))
+                    ++localcounts[cn->node()->experiment][std::make_pair(cn->node()->experiment->fwBarcodeSet[nodes[1]->node()->sequence], cn->node()->experiment->revBarcodeSet[nodes[2]->node()->sequence])][in->insertSequence()];
                 else {
                     fail = ThreadSynchronization::FailedMatch::Fail::insertMatchFailed;
                     ++unmatchedInsertSequence;
@@ -662,6 +816,9 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
             sync->outqueue.emplace(std::move(rd), fail, std::move(nodes));
             oqlock.unlock();
             sync->outqueueempty.notify_one();
+        } else {
+            for (auto &n : nodes)
+                delete n;
         }
     }
 
