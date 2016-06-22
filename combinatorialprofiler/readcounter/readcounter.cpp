@@ -1252,7 +1252,7 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_4ndsi___get__(struct __py
 static PyObject *__pyx_pf_11readcounter_12PyExperiment_12sorted_cells___get__(struct __pyx_obj_11readcounter_PyExperiment *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_11readcounter_12PyExperiment_6counts___get__(struct __pyx_obj_11readcounter_PyExperiment *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_11readcounter_make_unique(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_barcodes, int __pyx_v_minlength); /* proto */
-static int __pyx_pf_11readcounter_13PyReadCounter___cinit__(struct __pyx_obj_11readcounter_PyReadCounter *__pyx_v_self, PyObject *__pyx_v_experiments, int __pyx_v_mismatches, int __pyx_v_minlength, int __pyx_v_barcode_mismatches); /* proto */
+static int __pyx_pf_11readcounter_13PyReadCounter___cinit__(struct __pyx_obj_11readcounter_PyReadCounter *__pyx_v_self, PyObject *__pyx_v_experiments, int __pyx_v_mismatches, int __pyx_v_minlength, float __pyx_v_barcode_mismatches); /* proto */
 static void __pyx_pf_11readcounter_13PyReadCounter_2__dealloc__(struct __pyx_obj_11readcounter_PyReadCounter *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_11readcounter_13PyReadCounter_4countReads(struct __pyx_obj_11readcounter_PyReadCounter *__pyx_v_self, PyObject *__pyx_v_fpath, PyObject *__pyx_v_unmatchedpattern, PyObject *__pyx_v_threads); /* proto */
 static PyObject *__pyx_pf_11readcounter_13PyReadCounter_18allowed_mismatches___get__(struct __pyx_obj_11readcounter_PyReadCounter *__pyx_v_self); /* proto */
@@ -5129,7 +5129,7 @@ static PyObject *__pyx_pf_11readcounter_make_unique(CYTHON_UNUSED PyObject *__py
 /* "readcounter.pyx":204
  *     cdef list _exprmnts
  * 
- *     def __cinit__(self, list experiments, int mismatches=1, int minlength=0, int barcode_mismatches=0):             # <<<<<<<<<<<<<<
+ *     def __cinit__(self, list experiments, int mismatches=1, int minlength=0, float barcode_mismatches=0):             # <<<<<<<<<<<<<<
  *         cdef vector[Experiment*] vec
  *         cdef PyExperiment exp;
  */
@@ -5140,7 +5140,7 @@ static int __pyx_pw_11readcounter_13PyReadCounter_1__cinit__(PyObject *__pyx_v_s
   PyObject *__pyx_v_experiments = 0;
   int __pyx_v_mismatches;
   int __pyx_v_minlength;
-  int __pyx_v_barcode_mismatches;
+  float __pyx_v_barcode_mismatches;
   int __pyx_r;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__cinit__ (wrapper)", 0);
@@ -5204,9 +5204,9 @@ static int __pyx_pw_11readcounter_13PyReadCounter_1__cinit__(PyObject *__pyx_v_s
       __pyx_v_minlength = ((int)0);
     }
     if (values[3]) {
-      __pyx_v_barcode_mismatches = __Pyx_PyInt_As_int(values[3]); if (unlikely((__pyx_v_barcode_mismatches == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 204, __pyx_L3_error)
+      __pyx_v_barcode_mismatches = __pyx_PyFloat_AsFloat(values[3]); if (unlikely((__pyx_v_barcode_mismatches == (float)-1) && PyErr_Occurred())) __PYX_ERR(0, 204, __pyx_L3_error)
     } else {
-      __pyx_v_barcode_mismatches = ((int)0);
+      __pyx_v_barcode_mismatches = ((float)0.0);
     }
   }
   goto __pyx_L4_argument_unpacking_done;
@@ -5229,7 +5229,7 @@ static int __pyx_pw_11readcounter_13PyReadCounter_1__cinit__(PyObject *__pyx_v_s
   return __pyx_r;
 }
 
-static int __pyx_pf_11readcounter_13PyReadCounter___cinit__(struct __pyx_obj_11readcounter_PyReadCounter *__pyx_v_self, PyObject *__pyx_v_experiments, int __pyx_v_mismatches, int __pyx_v_minlength, int __pyx_v_barcode_mismatches) {
+static int __pyx_pf_11readcounter_13PyReadCounter___cinit__(struct __pyx_obj_11readcounter_PyReadCounter *__pyx_v_self, PyObject *__pyx_v_experiments, int __pyx_v_mismatches, int __pyx_v_minlength, float __pyx_v_barcode_mismatches) {
   std::vector<Experiment *>  __pyx_v_vec;
   struct __pyx_obj_11readcounter_PyExperiment *__pyx_v_exp = 0;
   int __pyx_r;
@@ -5319,7 +5319,7 @@ static int __pyx_pf_11readcounter_13PyReadCounter___cinit__(struct __pyx_obj_11r
   /* "readcounter.pyx":204
  *     cdef list _exprmnts
  * 
- *     def __cinit__(self, list experiments, int mismatches=1, int minlength=0, int barcode_mismatches=0):             # <<<<<<<<<<<<<<
+ *     def __cinit__(self, list experiments, int mismatches=1, int minlength=0, float barcode_mismatches=0):             # <<<<<<<<<<<<<<
  *         cdef vector[Experiment*] vec
  *         cdef PyExperiment exp;
  */
@@ -5717,7 +5717,7 @@ static PyObject *__pyx_pf_11readcounter_13PyReadCounter_26allowed_barcode_mismat
  *     @property
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyInt_From_uint16_t(__pyx_v_self->_rdcntr->allowedBarcodeMismatches()); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 227, __pyx_L1_error)
+  __pyx_t_1 = PyFloat_FromDouble(__pyx_v_self->_rdcntr->allowedBarcodeMismatches()); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 227, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;

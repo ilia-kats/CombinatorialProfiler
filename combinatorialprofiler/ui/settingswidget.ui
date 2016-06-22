@@ -78,7 +78,7 @@
    <item row="2" column="0">
     <widget class="QLabel" name="label_3">
      <property name="text">
-      <string>Allowed mismatches in barcode sequence:</string>
+      <string>Maximum mismatched fraction of barcode sequence:</string>
      </property>
      <property name="buddy">
       <cstring>barcodeMismatches</cstring>
@@ -86,15 +86,21 @@
     </widget>
    </item>
    <item row="2" column="1">
-    <widget class="QSpinBox" name="barcodeMismatches">
+    <widget class="QDoubleSpinBox" name="barcodeMismatches">
      <property name="sizePolicy">
       <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
        <horstretch>0</horstretch>
        <verstretch>0</verstretch>
       </sizepolicy>
      </property>
-     <property name="suffix">
-      <string> base(s)</string>
+     <property name="decimals">
+      <number>3</number>
+     </property>
+     <property name="maximum">
+      <double>0.500000000000000</double>
+     </property>
+     <property name="singleStep">
+      <double>0.050000000000000</double>
      </property>
     </widget>
    </item>

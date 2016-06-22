@@ -40,21 +40,21 @@ public:
 };
 
 class InsertNode;
-class Node;
+class NodeBase;
 
 UniqueBarcodes makeUnique(const std::unordered_set<std::string>&, uint16_t);
 
 class ReadCounter
 {
 public:
-    ReadCounter(std::vector<Experiment*>, uint16_t insert_mismatches = 1, uint16_t unique_barcode_length = 0, uint16_t allowed_barcode_mismatches = 0);
+    ReadCounter(std::vector<Experiment*>, uint16_t insert_mismatches = 1, uint16_t unique_barcode_length = 0, float allowed_barcode_mismatches = 0);
     ~ReadCounter();
 
     void countReads(const std::string&, const std::string&, int threads=1);
 
     uint16_t allowedMismatches() const;
     uint16_t minimumUniqueBarcodeLength() const;
-    uint16_t allowedBarcodeMismatches() const;
+    float allowedBarcodeMismatches() const;
 
     uint64_t read() const;
     uint64_t counted() const;
@@ -72,7 +72,7 @@ private:
 
     uint16_t m_allowedMismatches;
     uint16_t m_uniqueBarcodeLength;
-    uint16_t m_allowedBarcodeMismatches;
+    float m_allowedBarcodeMismatches;
 
     uint64_t m_read;
     uint64_t m_counted;
@@ -85,7 +85,7 @@ private:
     std::vector<Experiment*> m_experiments;
 
     std::vector<InsertNode*> m_tree;
-    std::vector<Node*> m_nodes;
+    std::vector<NodeBase*> m_nodes;
     std::unordered_map<std::string, UniqueBarcodes> m_uniqueFwCodes;
     std::unordered_map<std::string, UniqueBarcodes> m_uniqueRevCodes;
 

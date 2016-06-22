@@ -44,11 +44,11 @@ cdef extern from "cReadCounter.h" nogil:
     UniqueBarcodes makeUnique(unordered_set[string], uint16_t)
 
     cdef cppclass ReadCounter:
-        ReadCounter(vector[Experiment*], uint16_t mismatches, uint16_t unique_barcode_length, uint16_t allowed_barcode_mismatches) except+
+        ReadCounter(vector[Experiment*], uint16_t mismatches, uint16_t unique_barcode_length, float allowed_barcode_mismatches) except+
         void countReads(const string&, const string&, int)
         uint16_t minimumUniqueBarcodeLength()
         uint16_t allowedMismatches()
-        uint16_t allowedBarcodeMismatches()
+        float allowedBarcodeMismatches()
         uint64_t read()
         uint64_t unmatchedTotal()
         uint64_t unmatchedInsert()
@@ -201,7 +201,7 @@ cdef class PyReadCounter:
     cdef ReadCounter *_rdcntr
     cdef list _exprmnts
 
-    def __cinit__(self, list experiments, int mismatches=1, int minlength=0, int barcode_mismatches=0):
+    def __cinit__(self, list experiments, int mismatches=1, int minlength=0, float barcode_mismatches=0):
         cdef vector[Experiment*] vec
         cdef PyExperiment exp;
         self._exprmnts = experiments

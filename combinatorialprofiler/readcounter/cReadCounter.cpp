@@ -121,15 +121,15 @@ Experiment::Experiment(std::string n)
 : name(std::move(n)), ndsi(NDSIS::noNDSI)
 {}
 
-class Node
+class NodeBase
 {
 public:
 class MatchBase
 {
 public:
-    MatchBase(const Node *n)
+    MatchBase(const NodeBase *n)
     : m_node(n), m_match(true) {}
-    MatchBase(const Node *n, bool m)
+    MatchBase(const NodeBase *n, bool m)
     : m_node(n), m_match(m) {}
     virtual ~MatchBase() {}
 
@@ -138,13 +138,13 @@ public:
         return m_match;
     }
 
-    const Node* node()
+    const NodeBase* node()
     {
         return m_node;
     }
 
 protected:
-    const Node *m_node;
+    const NodeBase *m_node;
     bool m_match;
 };
 
@@ -177,7 +177,7 @@ public:
     }
     friend bool operator==(const Match &l, const Match &r)
     {
-        return l.match && r.match && l.m_calcBackMismatches == r.m_calcBackMismatches;
+        return l.match && r.match && l.m_mismatches == r.m_mismatches;
     }
     friend bool operator!=(const Match &l, const Match &r)
     {
@@ -185,31 +185,29 @@ public:
     }
 
 protected:
-    Match(const Node *n, bool m)
+    Match(const NodeBase *n, bool m)
     : MatchBase(n, m), m_mismatches(0) {}
 
-    Match(const Node *n, bool m, T mismatches)
+    Match(const NodeBase *n, bool m, T mismatches)
     : MatchBase(n, m), m_mismatches(mismatches) {}
 
     T m_mismatches;
 };
 
-    Node() : experiment(nullptr) {}
-    Node(std::string seq, std::string::size_type mismatches = 0)
-    : experiment(nullptr), sequence(std::move(seq)), m_allowedMismatches(mismatches) {}
+    NodeBase() : experiment(nullptr) {}
+    NodeBase(std::string seq)
+    : experiment(nullptr), sequence(std::move(seq)) {}
 
-    virtual ~Node() {}
+    virtual ~NodeBase() {}
 
     virtual MatchBase* match(Read&) const = 0;
 
     Experiment *experiment;
 
-    std::vector<Node*> children;
+    std::vector<NodeBase*> children;
     std::string sequence;
 
 protected:
-    std::string::size_type m_allowedMismatches;
-
     template<class NeedleIt, class HaystackIt>
     static std::pair<std::string::size_type, std::string::size_type> fuzzy_find(NeedleIt nbegin, NeedleIt nend, HaystackIt hbegin, HaystackIt hend)
     {
@@ -237,14 +235,27 @@ protected:
     }
 };
 
-class BarcodeNode : public Node
+template<typename T>
+class Node : public NodeBase
+{
+public:
+    Node(std::string seq, T mismatches = 0)
+    : NodeBase(seq), m_allowedMismatches(mismatches)
+    {}
+    virtual ~Node() {}
+
+protected:
+    T m_allowedMismatches;
+};
+
+class BarcodeNode : public Node<float>
 {
 public:
 class BarcodeMatch : public Match<float>
 {
 public:
     BarcodeMatch(const BarcodeNode *n, std::string::size_type length, std::string::size_type mismatches)
-    : Match(n, false, (float)mismatches * (float)n->sequence.size() / (float)length), m_matchedLength(length), m_actualMismatches(mismatches)
+    : Match(n, false, (float)mismatches / (float)length), m_matchedLength(length), m_actualMismatches(mismatches)
     {
         if (m_mismatches > n->m_allowedMismatches)
             m_match = false;
@@ -266,7 +277,7 @@ private:
     }
 
 protected:
-    BarcodeNode(std::string seq, std::vector<std::string> uniqueseq, std::string::size_type mismatches=0)
+    BarcodeNode(std::string seq, std::vector<std::string> uniqueseq, float mismatches=0)
     : Node(std::move(seq), mismatches), m_uniqueSequences(std::move(uniqueseq))
     {}
 
@@ -277,7 +288,7 @@ class RevBarcodeNode : public BarcodeNode
 {
 public:
     RevBarcodeNode() : BarcodeNode() {}
-    RevBarcodeNode(std::string fullseq, std::vector<std::string> uniqueSeqs, std::string::size_type mismatches=0)
+    RevBarcodeNode(std::string fullseq, std::vector<std::string> uniqueSeqs, float mismatches=0)
     : BarcodeNode(std::move(fullseq), std::move(uniqueSeqs), mismatches)
     {
         for (auto &s : m_uniqueSequences) {
@@ -315,7 +326,7 @@ class FwBarcodeNode : public BarcodeNode
 {
 public:
     FwBarcodeNode() : BarcodeNode() {}
-    FwBarcodeNode(std::string fullseq, std::vector<std::string> uniqueSeqs, std::string::size_type mismatches=0)
+    FwBarcodeNode(std::string fullseq, std::vector<std::string> uniqueSeqs, float mismatches=0)
     : BarcodeNode(std::move(fullseq), std::move(uniqueSeqs), mismatches)
     {}
 
@@ -345,7 +356,7 @@ public:
     }
 };
 
-class InsertNode : public Node
+class InsertNode : public Node<std::string::size_type>
 {
 public:
 class InsertMatch : public Match<std::string::size_type>
@@ -451,7 +462,7 @@ UniqueBarcodes makeUnique(const std::unordered_set<std::string> &codes, uint16_t
     return uniqueCodes;
 }
 
-ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_mismatches, uint16_t unique_barcode_length, uint16_t allowed_barcode_mismatches)
+ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_mismatches, uint16_t unique_barcode_length, float allowed_barcode_mismatches)
 : m_allowedMismatches(insert_mismatches), m_uniqueBarcodeLength(unique_barcode_length), m_allowedBarcodeMismatches(allowed_barcode_mismatches), m_read(0), m_counted(0), m_unmatchedTotal(0), m_unmatchedInsert(0), m_unmatchedBarcodes(0), m_unmatchedInsertSequence(0), m_written(0), m_experiments(experiments)
 {
     std::unordered_map<std::string, std::unordered_set<std::string>> fwCodes;
@@ -542,9 +553,9 @@ struct ReadCounter::ThreadSynchronization
         enum class Fail {noFail, insertFailed, barcodeFailed, insertMatchFailed};
         Read read;
         Fail fail;
-        std::vector<Node::MatchBase*> nodes;
+        std::vector<NodeBase::MatchBase*> nodes;
 
-        FailedMatch(Read r, Fail f, std::vector<Node::MatchBase*> ns)
+        FailedMatch(Read r, Fail f, std::vector<NodeBase::MatchBase*> ns)
         : read(std::move(r)), fail(f), nodes(std::move(ns))
         {}
     };
@@ -596,7 +607,7 @@ uint16_t ReadCounter::minimumUniqueBarcodeLength() const
     return m_uniqueBarcodeLength;
 }
 
-uint16_t ReadCounter::allowedBarcodeMismatches() const
+float ReadCounter::allowedBarcodeMismatches() const
 {
     return m_allowedBarcodeMismatches;
 }
@@ -747,7 +758,7 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
         sync->inqueuefull.notify_one();
 
         ThreadSynchronization::FailedMatch::Fail fail = ThreadSynchronization::FailedMatch::Fail::noFail;
-        std::vector<Node::MatchBase*> nodes;
+        std::vector<NodeBase::MatchBase*> nodes;
 
         std::string ins;
         InsertNode::InsertMatch *in = nullptr;
@@ -762,11 +773,11 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
                 delete cn;
         }
         if (in && *in) {
-            Node::MatchBase *cn = in;
+            NodeBase::MatchBase *cn = in;
             while (!cn->node()->experiment && cn->node()->children.size()) {
-                Node::MatchBase *best = nullptr;
+                NodeBase::MatchBase *best = nullptr;
                 for (const auto &n : cn->node()->children) {
-                    Node::MatchBase *bn = n->match(rd);
+                    NodeBase::MatchBase *bn = n->match(rd);
                     if (*bn && best && *bn < *best) {
                         delete best;
                         best = bn;
