@@ -16,10 +16,12 @@ class SettingsWidget(QWidget):
         self.ui.setupUi(self)
         self.ui.mismatches.valueChanged.connect(self.changed)
         self.ui.barcodeLength.valueChanged.connect(self.changed)
+        self.ui.barcodeMismatches.valueChanged.connect(self.changed)
 
     def serialize(self):
-        return {"insert_mismatches" : self.ui.mismatches.value(), "barcode_length" : self.ui.barcodeLength.value()}
+        return {"insert_mismatches" : self.ui.mismatches.value(), "barcode_length" : self.ui.barcodeLength.value(), "barcode_mismatches" : self.ui.barcodeMismatches.value()}
 
     def unserialize(self, d):
         self.ui.mismatches.setValue(d.get('insert_mismatches', 0))
         self.ui.barcodeLength.setValue(d.get('barcode_length', 0))
+        self.ui.barcodeMismatches.setValue(d.get('barcode_mismatches', 0))
