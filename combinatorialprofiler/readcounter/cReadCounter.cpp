@@ -299,7 +299,7 @@ public:
     virtual BarcodeMatch* match(Read &rd) const
     {
         auto rdseq = rd.getSequence();
-        std::pair<decltype(m_uniqueSequences)::size_type, std::string::size_type> bestFind(SIZE_MAX, SIZE_MAX);
+        std::pair<decltype(m_uniqueSequences)::size_type, std::string::size_type> bestFind(0, SIZE_MAX);
         if (!m_allowedMismatches) {
             for (const auto &seq : m_uniqueSequences) {
                 if (!rdseq.compare(rdseq.size() - seq.size(), seq.size(), seq)) {
@@ -333,7 +333,7 @@ public:
     virtual BarcodeMatch* match(Read &rd) const
     {
         auto rdseq = rd.getSequence();
-        std::pair<decltype(m_uniqueSequences)::size_type, std::string::size_type> bestFind(SIZE_MAX, SIZE_MAX);
+        std::pair<decltype(m_uniqueSequences)::size_type, std::string::size_type> bestFind(0, SIZE_MAX);
         if (!m_allowedMismatches){
             for (const auto &seq : m_uniqueSequences) {
                 if (!rdseq.compare(0, seq.size(), seq)) {
@@ -351,6 +351,7 @@ public:
                 if (!found.second)
                     break;
             }
+
         }
         return new BarcodeMatch(this, m_uniqueSequences[bestFind.first].size(), bestFind.second);
     }
@@ -781,7 +782,6 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
                     if (*bn && best && *bn < *best) {
                         delete best;
                         best = bn;
-                        break;
                     } else if (*bn && !best) {
                         best = bn;
                     } else
