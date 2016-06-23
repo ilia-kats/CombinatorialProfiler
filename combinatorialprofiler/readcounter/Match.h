@@ -4,7 +4,7 @@
 #include <string>
 
 class NodeBase;
-class BarcodeNode;
+class HammingBarcodeNode;
 class InsertNode;
 
 class MatchBase
@@ -50,10 +50,10 @@ protected:
     T m_mismatches;
 };
 
-class BarcodeMatch : public Match<float>
+class HammingBarcodeMatch : public Match<float>
 {
 public:
-    BarcodeMatch(const BarcodeNode*, std::string::size_type, std::string::size_type);
+    HammingBarcodeMatch(const HammingBarcodeNode*, std::string::size_type, std::string::size_type);
 
 private:
     std::string::size_type m_matchedLength;

@@ -72,7 +72,7 @@ Match<T>::Match(const NodeBase *n, bool m, T mismatches)
 template<typename T>
 Match<T>::~Match() {}
 
-BarcodeMatch::BarcodeMatch(const BarcodeNode *n, std::string::size_type length, std::string::size_type mismatches)
+HammingBarcodeMatch::HammingBarcodeMatch(const HammingBarcodeNode *n, std::string::size_type length, std::string::size_type mismatches)
 : Match(n, false, (float)mismatches / (float)length), m_matchedLength(length), m_actualMismatches(mismatches)
 {
     if (m_mismatches > n->allowedMismatches())

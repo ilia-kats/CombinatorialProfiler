@@ -77,13 +77,13 @@ ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_m
         m_uniqueRevCodes[c.first] = makeUnique(c.second, m_uniqueBarcodeLength);
     }
 
-    std::unordered_map<std::string, std::unordered_map<std::string, BarcodeNode*>> fwNodes;
-    std::unordered_map<std::string,BarcodeNode*> dummyNodes;
+    std::unordered_map<std::string, std::unordered_map<std::string, HammingBarcodeNode*>> fwNodes;
+    std::unordered_map<std::string, HammingBarcodeNode*> dummyNodes;
 
     for (const auto &exp : m_experiments) {
-        std::vector<BarcodeNode*> revNodes;
+        std::vector<HammingBarcodeNode*> revNodes;
         for (const auto &c : exp->revBarcodeSet) {
-            BarcodeNode *n = new RevBarcodeNode(c.first, m_uniqueRevCodes[exp->insert][c.first], m_allowedBarcodeMismatches);
+            HammingBarcodeNode *n = new RevHammingBarcodeNode(c.first, m_allowedBarcodeMismatches, m_uniqueRevCodes[exp->insert][c.first]);
             n->experiment = exp;
             revNodes.push_back(n);
             m_nodes.push_back(n);
@@ -91,7 +91,7 @@ ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_m
 
         for (const auto &c : exp->fwBarcodeSet) {
             if (!fwNodes[exp->insert].count(c.first)) {
-                BarcodeNode *n = new FwBarcodeNode(c.first, m_uniqueFwCodes[exp->insert][c.first], m_allowedBarcodeMismatches);
+                HammingBarcodeNode *n = new FwHammingBarcodeNode(c.first, m_allowedBarcodeMismatches, m_uniqueFwCodes[exp->insert][c.first]);
                 fwNodes[exp->insert][c.first] = n;
                 m_nodes.push_back(n);
                 inserts[exp->insert]->children.push_back(n);
@@ -100,7 +100,7 @@ ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_m
         }
         if (!exp->fwBarcodeSet.size()) {
             if (!dummyNodes.count(exp->insert)) {
-                BarcodeNode *n = new BarcodeNode();
+                HammingBarcodeNode *n = new DummyHammingBarcodeNode();
                 m_nodes.push_back(n);
                 dummyNodes[exp->insert] = n;
                 std::copy(revNodes.cbegin(), revNodes.cend(), std::inserter(n->children, n->children.end()));
@@ -114,7 +114,7 @@ ReadCounter::ReadCounter(std::vector<Experiment*> experiments, uint16_t insert_m
     }
     for (const auto &exp : m_experiments) {
         if (!exp->revBarcodeSet.size()) {
-            BarcodeNode *n = new BarcodeNode();
+            HammingBarcodeNode *n = new DummyHammingBarcodeNode();
             n->experiment = exp;
             m_nodes.push_back(n);
             if (exp->fwBarcodeSet.size()) {

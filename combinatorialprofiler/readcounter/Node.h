@@ -38,6 +38,8 @@ template<typename T>
 class Node : public NodeBase
 {
 public:
+    typedef T mismatch_type;
+
     Node(std::string seq, T mismatches)
     : NodeBase(seq), m_allowedMismatches(mismatches) {}
     virtual ~Node() {}
@@ -51,55 +53,63 @@ protected:
     T m_allowedMismatches;
 };
 
-
-class BarcodeNode : public Node<float>
+class BarcodeNode
 {
-public:
-    BarcodeNode();
-    virtual ~BarcodeNode();
-
-    virtual BarcodeMatch* match(Read&) const;
-
 protected:
-    BarcodeNode(std::string, std::vector<std::string>, float mismatches=0);
-
-    std::vector<std::string> m_uniqueSequences;
-};
-
-class MatchingBarcodeNode : public BarcodeNode
-{
-public:
-    virtual BarcodeMatch *match(Read&) const;
-
-protected:
-    MatchingBarcodeNode(std::string, std::vector<std::string>, float mismatches=0);
-
-private:
     virtual std::string::const_iterator getReadPart(const Read&, std::string::size_type) const = 0;
 };
 
-class RevBarcodeNode : public MatchingBarcodeNode
+class FwBarcodeNode : virtual public BarcodeNode
 {
-public:
-    RevBarcodeNode(std::string, std::vector<std::string>, float mismatches=0);
-
-private:
+protected:
     virtual std::string::const_iterator getReadPart(const Read&, std::string::size_type) const;
 };
 
-class FwBarcodeNode : public MatchingBarcodeNode
+class RevBarcodeNode : virtual public BarcodeNode
+{
+protected:
+    virtual std::string::const_iterator getReadPart(const Read&, std::string::size_type) const;
+};
+
+class HammingBarcodeNode : public Node<float>, virtual public BarcodeNode
 {
 public:
-    FwBarcodeNode(std::string, std::vector<std::string>, float mismatches=0);
+    typedef HammingBarcodeMatch match_type;
 
-private:
-    virtual std::string::const_iterator getReadPart(const Read&, std::string::size_type) const;
+    HammingBarcodeNode(std::string, float mismatches, std::vector<std::string>);
+
+    virtual HammingBarcodeMatch* match(Read&) const;
+
+protected:
+    HammingBarcodeNode();
+    std::vector<std::string> m_uniqueSequences;
+};
+
+class FwHammingBarcodeNode : virtual public HammingBarcodeNode, virtual public FwBarcodeNode
+{
+public:
+    FwHammingBarcodeNode(std::string, float mismatches, std::vector<std::string>);
+};
+
+class RevHammingBarcodeNode: virtual public HammingBarcodeNode, virtual public RevBarcodeNode
+{
+public:
+    RevHammingBarcodeNode(std::string, float mismatches, std::vector<std::string>);
+};
+
+class DummyHammingBarcodeNode : virtual public HammingBarcodeNode, virtual public FwBarcodeNode
+{
+public:
+    DummyHammingBarcodeNode();
+    virtual HammingBarcodeMatch *match(Read&) const;
 };
 
 class InsertNode : public Node<std::string::size_type>
 {
 public:
-    InsertNode(std::string, std::string::size_type mismatches = 1);
+    typedef InsertMatch match_type;
+
+    InsertNode(std::string, std::string::size_type mismatches);
     virtual InsertMatch* match(Read&) const;
 
 private:
