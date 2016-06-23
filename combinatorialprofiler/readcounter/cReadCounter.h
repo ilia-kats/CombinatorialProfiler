@@ -1,19 +1,13 @@
 #ifndef READCOUNTER_H
 #define READCOUNTER_H
 
+#include "util.h"
+
 #include <unordered_map>
 #include <unordered_set>
 #include <functional>
 #include <string>
 #include <vector>
-
-namespace std
-{
-template<> struct hash<std::pair<std::string, std::string>>
-{
-    size_t operator()(const std::pair<std::string, std::string> &p) const;
-};
-}
 
 typedef std::unordered_map<std::string, std::string> SequenceSet;
 typedef std::unordered_map<std::string, std::unordered_map<std::string, double>> SortedCellCounts;

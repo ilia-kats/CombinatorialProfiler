@@ -9,10 +9,12 @@ from setuptools import setup, find_packages
 from setuptools.extension import Extension
 from setuptools.command.develop import develop
 
+from glob import glob
+
 from combinatorialprofiler import version
 
 readcounter = Extension("combinatorialprofiler.readcounter",
-        sources=["combinatorialprofiler/readcounter/readcounter.cpp", "combinatorialprofiler/readcounter/cReadCounter.cpp"],
+        sources=glob("combinatorialprofiler/readcounter/*.cpp"),
         language="c++",
         extra_compile_args=["-std=c++14"],
         extra_link_args=["-std=c++14"]
