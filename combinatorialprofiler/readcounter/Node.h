@@ -28,30 +28,10 @@ public:
 
 protected:
     template<class NeedleIt, class HaystackIt>
-    static std::pair<std::string::size_type, std::string::size_type> fuzzy_find(NeedleIt nbegin, NeedleIt nend, HaystackIt hbegin, HaystackIt hend)
-    {
-        auto hsize = std::distance(hbegin, hend);
-        auto nsize = std::distance(nbegin, nend);
-        auto totest = hsize - nsize + 1;
-        if (totest <= 0)
-            return std::make_pair(0, UINT16_MAX);
-        std::pair<std::string::size_type, std::string::size_type> bestMatch(0, SIZE_MAX);
-        for (std::string::size_type i = 0; i < totest; ++i) {
-            auto mm = std::inner_product(nbegin,
-                                         nend,
-                                         hbegin + i,
-                                         static_cast<std::string::size_type>(0),
-                                         std::plus<std::string::size_type>(),
-                                         [](const typename decltype(nbegin)::value_type &n, const typename decltype(hbegin)::value_type &h) -> bool {return static_cast<bool>(n ^ h);});
-            if (mm < bestMatch.second) {
-                bestMatch.first = i;
-                bestMatch.second = mm;
-            }
-            if (!mm)
-                break;
-        }
-        return bestMatch;
-    }
+    static std::pair<std::string::size_type, std::string::size_type> fuzzy_find(NeedleIt nbegin, NeedleIt nend, HaystackIt hbegin, HaystackIt hend);
+
+    template<class NeedleIt, class HaystackIt>
+    static std::string::size_type hamming_distance(NeedleIt nbegin, NeedleIt nend, HaystackIt hbegin);
 };
 
 template<typename T>
@@ -71,6 +51,7 @@ protected:
     T m_allowedMismatches;
 };
 
+
 class BarcodeNode : public Node<float>
 {
 public:
@@ -85,22 +66,34 @@ protected:
     std::vector<std::string> m_uniqueSequences;
 };
 
-class RevBarcodeNode : public BarcodeNode
+class MatchingBarcodeNode : public BarcodeNode
 {
 public:
-    RevBarcodeNode();
-    RevBarcodeNode(std::string, std::vector<std::string>, float mismatches=0);
+    virtual BarcodeMatch *match(Read&) const;
 
-    virtual BarcodeMatch* match(Read&) const;
+protected:
+    MatchingBarcodeNode(std::string, std::vector<std::string>, float mismatches=0);
+
+private:
+    virtual std::string::const_iterator getReadPart(const Read&, std::string::size_type) const = 0;
 };
 
-class FwBarcodeNode : public BarcodeNode
+class RevBarcodeNode : public MatchingBarcodeNode
 {
 public:
-    FwBarcodeNode();
+    RevBarcodeNode(std::string, std::vector<std::string>, float mismatches=0);
+
+private:
+    virtual std::string::const_iterator getReadPart(const Read&, std::string::size_type) const;
+};
+
+class FwBarcodeNode : public MatchingBarcodeNode
+{
+public:
     FwBarcodeNode(std::string, std::vector<std::string>, float mismatches=0);
 
-    virtual BarcodeMatch* match(Read&) const;
+private:
+    virtual std::string::const_iterator getReadPart(const Read&, std::string::size_type) const;
 };
 
 class InsertNode : public Node<std::string::size_type>
