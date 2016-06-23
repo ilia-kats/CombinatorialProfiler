@@ -31,6 +31,30 @@ std::string revCompl(const std::string &seq)
     return seq2;
 }
 
+UniqueBarcodes makeUnique(const std::unordered_set<std::string> &codes, uint16_t minlength)
+{
+    std::unordered_map<std::string, std::vector<std::string>> uniqueCodes;
+    for (const auto &c : codes) {
+        std::vector<std::string> u;
+        u.push_back(c);
+        if (minlength) {
+            for (std::remove_reference<decltype(c)>::type::size_type i = 1; i < c.size() && c.size() - i >= minlength; ++i) {
+                bool found = false;
+                for (const auto &cc : codes) {
+                    if (cc != c && cc.find(c.c_str() + i) != std::remove_reference<decltype(cc)>::type::npos) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                    u.push_back(c.substr(i));
+            }
+        }
+        uniqueCodes[c] = std::move(u);
+    }
+    return uniqueCodes;
+}
+
 namespace std
 {
     size_t hash<std::pair<std::string, std::string>>::operator()(const std::pair<std::string, std::string> &p) const

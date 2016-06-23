@@ -12,16 +12,21 @@ from libc.stdint cimport *
 
 import pandas as pd
 
+cdef extern from "Node.h" nogil:
+    cdef cppclass HammingBarcodeNode:
+        HammingBarcodeNode(string, float, vector[string]) except+
 
+cdef extern from "util.h" nogil:
+    ctypedef unordered_map[string, vector[string]] UniqueBarcodes
+    UniqueBarcodes makeUnique(unordered_set[string], uint16_t)
 
-cdef extern from "cReadCounter.h" nogil:
+cdef extern from "Experiment.h" nogil:
     ctypedef unordered_map[string, unordered_set[string]] InsertSet
     ctypedef unordered_map[string, unordered_map[string, vector[string]]] BarcodeSet
 
     ctypedef unordered_map[string, string] SequenceSet
     ctypedef unordered_map[string, unordered_map[string, double]] SortedCellCounts
     ctypedef unordered_map[pair[string, string], unordered_map[string, uint64_t]] Counts
-    ctypedef unordered_map[string, vector[string]] UniqueBarcodes
 
     cpdef enum NDSIS:
         noNDSI = 0
@@ -41,14 +46,11 @@ cdef extern from "cReadCounter.h" nogil:
         SortedCellCounts sortedCells
         Counts counts
 
-    UniqueBarcodes makeUnique(unordered_set[string], uint16_t)
-
-    cdef cppclass ReadCounter:
-        ReadCounter(vector[Experiment*], uint16_t mismatches, uint16_t unique_barcode_length, float allowed_barcode_mismatches) except+
+cdef extern from "ReadCounter.h" nogil:
+    cdef cppclass ReadCounter[BarcodeNodeBase]:
+        ReadCounter(vector[Experiment*], uint16_t mismatches) except+
         void countReads(const string&, const string&, int)
-        uint16_t minimumUniqueBarcodeLength()
         uint16_t allowedMismatches()
-        float allowedBarcodeMismatches()
         uint64_t read()
         uint64_t unmatchedTotal()
         uint64_t unmatchedInsert()
@@ -57,6 +59,12 @@ cdef extern from "cReadCounter.h" nogil:
         uint64_t counted()
         uint64_t written()
 
+cdef extern from "HammingReadCounter.h" nogil:
+    cdef cppclass HammingReadCounter(ReadCounter[HammingBarcodeNode]):
+        @staticmethod
+        HammingReadCounter* getReadCounter(vector[Experiment*], uint16_t mismatches, uint16_t unique_barcode_length, float allowed_barcode_mismatches) except+
+        uint16_t minimumUniqueBarcodeLength()
+        float allowedBarcodeMismatches()
         unordered_map[string, UniqueBarcodes] uniqueForwardBarcodes()
         unordered_map[string, UniqueBarcodes] uniqueReverseBarcodes()
 
@@ -198,7 +206,7 @@ def make_unique(barcodes, int minlength=0):
     return makeUnique(codes, minlength);
 
 cdef class PyReadCounter:
-    cdef ReadCounter *_rdcntr
+    cdef HammingReadCounter *_rdcntr
     cdef list _exprmnts
 
     def __cinit__(self, list experiments, int mismatches=1, int minlength=0, float barcode_mismatches=0):
@@ -207,7 +215,7 @@ cdef class PyReadCounter:
         self._exprmnts = experiments
         for exp in self._exprmnts:
             vec.push_back((<PyExperiment>exp)._exprmnt)
-        self._rdcntr = new ReadCounter(vec, mismatches, minlength, barcode_mismatches)
+        self._rdcntr = HammingReadCounter.getReadCounter(vec, mismatches, minlength, barcode_mismatches)
 
     def __dealloc__(self):
         del self._rdcntr

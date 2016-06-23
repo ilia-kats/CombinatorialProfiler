@@ -13,8 +13,9 @@ from glob import glob
 
 from combinatorialprofiler import version
 
+readcounter_basepath = "combinatorialprofiler/readcounter/"
 readcounter = Extension("combinatorialprofiler.readcounter",
-        sources=glob("combinatorialprofiler/readcounter/*.cpp"),
+        sources=glob(readcounter_basepath + "*.cpp"),
         language="c++",
         extra_compile_args=["-std=c++14"],
         extra_link_args=["-std=c++14"]
@@ -28,8 +29,11 @@ class debugmode(develop):
         import os.path
         global readcounter
         readcounter.extra_compile_args.append("-O0")
-        path, ext = os.path.splitext(readcounter.sources[0])
-        readcounter.sources[0] = path + ".pyx"
+
+        print(readcounter.sources)
+        cythonfile = readcounter.sources.index(readcounter_basepath + "readcounter.cpp")
+        path, ext = os.path.splitext(readcounter.sources[cythonfile])
+        readcounter.sources[cythonfile] = path + ".pyx"
         readcounter = cythonize(readcounter)
 
 
