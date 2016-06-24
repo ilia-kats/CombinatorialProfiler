@@ -26,12 +26,13 @@ from .readcounter import PyHammingReadCounter, PySeqlevReadCounter, PyExperiment
 from . import version
 
 def normalizeCounts(df, sortedcells):
+    categories = (df['experiment'].cat.categories, df['barcode_fw'].cat.categories, df['barcode_rev'].cat.categories)
     df = df.set_index(['experiment','barcode_fw', 'barcode_rev','sequence'])
     df['normalized_counts'] = (df['counts'] / df.groupby(level=['barcode_fw', 'barcode_rev'])['counts'].transform(sum)).unstack(['experiment','sequence']).mul(sortedcells, axis=0).stack(['experiment','sequence']).reorder_levels(df.index.names).dropna()
     df = df.reset_index()
-    df['experiment'] = df['experiment'].astype("category")
-    df.barcode_fw = df.barcode_fw.astype("category")
-    df.barcode_rev = df.barcode_rev.astype("category")
+    df['experiment'] = df['experiment'].astype("category", categories=categories[0])
+    df['barcode_fw'] = df['barcode_fw'].astype("category", categories=categories[1])
+    df['barcode_rev'] = df['barcode_rev'].astype("category", categories=categories[2])
     return df
 
 class NDSISpec(object):
@@ -223,7 +224,7 @@ def main():
     if config.get('barcode_match_algo', 'hamming').lower() == 'seqlev':
         counter = PySeqlevReadCounter(experiments, insert_mismatches, config.get('barcode_mismatches', 0))
     else:
-        counter = PyReadCounter(experiments, insert_mismatches, config.get('barcode_length', 0), config.get('barcode_mismatches', 0))
+        counter = PyHammingReadCounter(experiments, insert_mismatches, config.get('barcode_length', 0), config.get('barcode_mismatches', 0))
         logging.debug("Unique forward barcodes: %s" % json.dumps(counter.unique_forward_barcodes, indent=4))
         logging.debug("Unique reverse barcodes: %s" % json.dumps(counter.unique_reverse_barcodes, indent=4))
 
