@@ -1,4 +1,5 @@
 #include "SeqlevReadCounter.h"
+#include "Node.h"
 
 SeqlevReadCounter* SeqlevReadCounter::getReadCounter(std::vector<Experiment*> experiments, uint16_t insert_mismatches, uint16_t allowed_barcode_mismatches)
 {
@@ -16,17 +17,17 @@ uint16_t SeqlevReadCounter::allowedBarcodeMismatches() const
     return m_allowedBarcodeMismatches;
 }
 
-SeqlevBarcodeNode* SeqlevReadCounter::makeFwCodeNode(const Experiment *e, const std::string &seq)
+NodeBase* SeqlevReadCounter::makeFwCodeNode(const Experiment *e, const std::string &seq)
 {
     return new FwSeqlevBarcodeNode(seq, m_allowedBarcodeMismatches);
 }
 
-SeqlevBarcodeNode* SeqlevReadCounter::makeRevCodeNode(const Experiment *e, const std::string &seq)
+NodeBase* SeqlevReadCounter::makeRevCodeNode(const Experiment *e, const std::string &seq)
 {
     return new RevSeqlevBarcodeNode(seq, m_allowedBarcodeMismatches);
 }
 
-SeqlevBarcodeNode* SeqlevReadCounter::makeDummyCodeNode()
+NodeBase* SeqlevReadCounter::makeDummyCodeNode()
 {
     return new DummySeqlevBarcodeNode();
 }

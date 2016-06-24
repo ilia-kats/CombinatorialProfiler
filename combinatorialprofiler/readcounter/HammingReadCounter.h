@@ -2,6 +2,7 @@
 #define HAMMING_READCOUNTER_H
 
 #include "ReadCounter.h"
+#include "util.h"
 
 class HammingReadCounter : public ReadCounter
 {
@@ -23,9 +24,9 @@ private:
     std::unordered_map<std::string, UniqueBarcodes> m_uniqueFwCodes;
     std::unordered_map<std::string, UniqueBarcodes> m_uniqueRevCodes;
 
-    virtual HammingBarcodeNode* makeFwCodeNode(const Experiment*, const std::string&);
-    virtual HammingBarcodeNode* makeRevCodeNode(const Experiment*, const std::string&);
-    virtual HammingBarcodeNode* makeDummyCodeNode();
+    virtual NodeBase* makeFwCodeNode(const Experiment*, const std::string&);
+    virtual NodeBase* makeRevCodeNode(const Experiment*, const std::string&);
+    virtual NodeBase* makeDummyCodeNode();
 };
 
 #endif

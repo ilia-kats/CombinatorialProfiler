@@ -137,12 +137,28 @@ public:
     typedef InsertMatch match_type;
 
     InsertNode(std::string, std::string::size_type mismatches);
-    virtual match_type* match(Read&) const;
+    virtual match_type* match(Read&) const = 0;
 
-private:
+protected:
     std::string m_upstreamseq;
     std::string m_downstreamseq;
     std::string::size_type m_insertlength;
+
+    match_type* getMatch(const Read&, std::string::size_type, std::string::size_type, std::string::size_type) const;
+};
+
+class ExactMatchingInsertNode : public InsertNode
+{
+public:
+    ExactMatchingInsertNode(std::string);
+    virtual InsertNode::match_type* match(Read&) const;
+};
+
+class HammingMatchingInsertNode : public InsertNode
+{
+public:
+    using InsertNode::InsertNode;
+    virtual InsertNode::match_type* match(Read&) const;
 };
 
 

@@ -111,7 +111,7 @@ void ReadCounter::init()
     std::unordered_map<std::string, InsertNode*> inserts;
     for (const auto &exp : m_experiments) {
         if (!inserts.count(exp->insert)) {
-            InsertNode *n = new InsertNode(exp->insert, m_allowedMismatches);
+            InsertNode *n = makeInsertNode(exp);
             inserts[exp->insert] = n;
             m_nodes.push_back(n);
             m_tree.push_back(n);
@@ -353,4 +353,12 @@ void ReadCounter::writeReads(const std::string &prefix, ThreadSynchronization *s
         for (auto &n : fmatch.nodes)
             delete n;
     }
+}
+
+InsertNode* ReadCounter::makeInsertNode(const Experiment *e) const
+{
+    if (m_allowedMismatches)
+        return new HammingMatchingInsertNode(e->insert, m_allowedMismatches);
+    else
+        return new ExactMatchingInsertNode(e->insert);
 }

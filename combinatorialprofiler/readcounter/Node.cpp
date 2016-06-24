@@ -150,44 +150,57 @@ InsertNode::InsertNode(std::string seq, std::string::size_type mismatches)
     m_downstreamseq = sequence.substr(insert_end + 1, std::string::npos);
 }
 
-InsertNode::match_type* InsertNode::match(Read &read) const
+InsertNode::match_type* InsertNode::getMatch(const Read &rd, std::string::size_type start, std::string::size_type end, std::string::size_type mismatches) const
+{
+    std::string insert;
+    auto it = rd.getSequence().cbegin();
+    std::copy(it + start, it + end, std::inserter(insert, insert.begin()));
+    return new InsertMatch(this, mismatches, std::move(insert));
+}
+
+ExactMatchingInsertNode::ExactMatchingInsertNode(std::string seq)
+: InsertNode(std::move(seq), 0)
+{}
+
+InsertNode::match_type* ExactMatchingInsertNode::match(Read &read) const
+{
+    auto start = read.getSequence().find(m_upstreamseq);
+    if (start == decltype(m_upstreamseq)::npos) {
+        read = read.reverseComplement();
+        start = read.getSequence().find(m_upstreamseq);
+        if (start == decltype(m_upstreamseq)::npos)
+            return new InsertMatch(this, false);
+    }
+    start += m_upstreamseq.size();
+    auto end = read.getSequence().find(m_downstreamseq, start);
+    if (end == decltype(m_downstreamseq)::npos || end - start != m_insertlength)
+        return new InsertMatch(this, false);
+    return getMatch(read, start, end, 0);
+}
+
+InsertNode::match_type* HammingMatchingInsertNode::match(Read &read) const
 {
     decltype(m_upstreamseq)::size_type start, end;
     std::string::size_type mismatches_cnt = 0;
-    if (m_allowedMismatches > 0) {
-        auto upstream = fuzzy_find(m_upstreamseq.cbegin(), m_upstreamseq.cend(), read.getSequence().cbegin(), read.getSequence().cend());
-        if (upstream.second > m_allowedMismatches) {
-            read = read.reverseComplement();
-            upstream = fuzzy_find(m_upstreamseq.cbegin(), m_upstreamseq.cend(), read.getSequence().cbegin(), read.getSequence().cend());
-            if (upstream.second > m_allowedMismatches)
-                return new InsertMatch(this, upstream.second);
-        }
-        start = upstream.first + m_upstreamseq.size();
-        auto downstream = fuzzy_find(m_downstreamseq.cbegin(), m_downstreamseq.cend(), read.getSequence().cbegin() + start, read.getSequence().cend());
-        downstream.first += start;
-        mismatches_cnt = downstream.second + upstream.second;
-        if (mismatches_cnt > m_allowedMismatches)
-            return new InsertMatch(this, mismatches_cnt);
-        end = downstream.first;
-    } else {
-        start = read.getSequence().find(m_upstreamseq);
-        if (start == decltype(m_upstreamseq)::npos) {
-            read = read.reverseComplement();
-            start = read.getSequence().find(m_upstreamseq);
-            if (start == decltype(m_upstreamseq)::npos)
-                return new InsertMatch(this, false);
-        }
-        start += m_upstreamseq.size();
-        end = read.getSequence().find(m_downstreamseq, start);
-        if (end == decltype(m_downstreamseq)::npos)
-            return new InsertMatch(this, false);
+
+    auto upstream = fuzzy_find(m_upstreamseq.cbegin(), m_upstreamseq.cend(), read.getSequence().cbegin(), read.getSequence().cend());
+    if (upstream.second > m_allowedMismatches) {
+        read = read.reverseComplement();
+        upstream = fuzzy_find(m_upstreamseq.cbegin(), m_upstreamseq.cend(), read.getSequence().cbegin(), read.getSequence().cend());
+        if (upstream.second > m_allowedMismatches)
+            return new InsertMatch(this, upstream.second);
     }
+    start = upstream.first + m_upstreamseq.size();
+    auto downstream = fuzzy_find(m_downstreamseq.cbegin(), m_downstreamseq.cend(), read.getSequence().cbegin() + start, read.getSequence().cend());
+    downstream.first += start;
+    mismatches_cnt = downstream.second + upstream.second;
+    if (mismatches_cnt > m_allowedMismatches)
+        return new InsertMatch(this, mismatches_cnt);
+    end = downstream.first;
 
     if (end - start != m_insertlength)
         return new InsertMatch(this, false);
 
-    std::string insert;
-    auto it = read.getSequence().cbegin();
-    std::copy(it + start, it + end, std::inserter(insert, insert.begin()));
-    return new InsertMatch(this, mismatches_cnt, std::move(insert));
+    return getMatch(read, start, end, mismatches_cnt);
 }
+

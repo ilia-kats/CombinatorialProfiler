@@ -1,12 +1,5 @@
 #ifndef READCOUNTER_H
 #define READCOUNTER_H
-
-#include "Experiment.h"
-#include "Read.h"
-#include "Node.h"
-#include "Match.h"
-#include "util.h"
-
 #include <unordered_map>
 #include <unordered_set>
 #include <functional>
@@ -26,6 +19,7 @@
 
 #include <cassert>
 
+class Experiment;
 class InsertNode;
 class NodeBase;
 
@@ -83,6 +77,7 @@ private:
 
     void writeReads(const std::string&, ThreadSynchronization*);
 
+    InsertNode* makeInsertNode(const Experiment*) const;
     virtual NodeBase* makeFwCodeNode(const Experiment*, const std::string&) = 0;
     virtual NodeBase* makeRevCodeNode(const Experiment*, const std::string&) = 0;
     virtual NodeBase* makeDummyCodeNode() = 0;

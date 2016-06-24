@@ -15,9 +15,9 @@ private:
 
     uint16_t m_allowedBarcodeMismatches;
 
-    virtual SeqlevBarcodeNode* makeFwCodeNode(const Experiment*, const std::string&);
-    virtual SeqlevBarcodeNode* makeRevCodeNode(const Experiment*, const std::string&);
-    virtual SeqlevBarcodeNode* makeDummyCodeNode();
+    virtual NodeBase* makeFwCodeNode(const Experiment*, const std::string&);
+    virtual NodeBase* makeRevCodeNode(const Experiment*, const std::string&);
+    virtual NodeBase* makeDummyCodeNode();
 };
 
 #endif

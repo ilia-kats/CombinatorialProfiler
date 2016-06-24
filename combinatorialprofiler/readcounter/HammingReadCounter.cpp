@@ -1,4 +1,6 @@
 #include "HammingReadCounter.h"
+#include "Node.h"
+#include "Experiment.h"
 
 HammingReadCounter* HammingReadCounter::getReadCounter(std::vector<Experiment*> experiments, uint16_t insert_mismatches, uint16_t unique_barcode_length, float allowed_barcode_mismatches)
 {
@@ -48,17 +50,17 @@ std::unordered_map<std::string, UniqueBarcodes> HammingReadCounter::uniqueRevers
     return m_uniqueRevCodes;
 }
 
-HammingBarcodeNode* HammingReadCounter::makeFwCodeNode(const Experiment *e, const std::string &seq)
+NodeBase* HammingReadCounter::makeFwCodeNode(const Experiment *e, const std::string &seq)
 {
     return new FwHammingBarcodeNode(seq, m_allowedBarcodeMismatches, m_uniqueFwCodes[e->insert][seq]);
 }
 
-HammingBarcodeNode* HammingReadCounter::makeRevCodeNode(const Experiment *e, const std::string &seq)
+NodeBase* HammingReadCounter::makeRevCodeNode(const Experiment *e, const std::string &seq)
 {
     return new RevHammingBarcodeNode(seq, m_allowedBarcodeMismatches, m_uniqueRevCodes[e->insert][seq]);
 }
 
-HammingBarcodeNode* HammingReadCounter::makeDummyCodeNode()
+NodeBase* HammingReadCounter::makeDummyCodeNode()
 {
     return new DummyHammingBarcodeNode();
 }
