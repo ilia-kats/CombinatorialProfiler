@@ -18,6 +18,8 @@ mpl.rcParams['pdf.fonttype'] = 42
 mpl.rcParams['ps.fonttype'] = 42
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from scipy.stats import gaussian_kde
 
 import Bio.Seq
 import Bio.Alphabet
@@ -150,16 +152,53 @@ def plot_correlations(df, nspec, limits, filename, experiment):
         for code, group in df.groupby(nspec.groupby):
             c = group['median_ndsi'].corr(group['pooled_ndsi'], method='spearman')
 
-            fig = plt.figure(figsize=(5,5))
-            ax = fig.add_subplot(111)
+            fig = plt.figure(figsize=(7,7))
+            ax = fig.add_subplot(1,1,1)
             ax.scatter(group['median_ndsi'], group['pooled_ndsi'], s=100, c="#000000", alpha=1/3, marker='.', edgecolor='none')
-            ax.set_xlim(*limits)
-            ax.set_ylim(*limits)
-            ax.set_title(code)
+
             ax.set_xlabel("median NDSI")
             ax.set_ylabel("pooled NDSI")
             ax.text(0.1, 0.9, "Spearman's $r = %.3g$" % c, transform=ax.transAxes)
             ax.set_aspect('equal', adjustable='box', anchor='C')
+
+            nbins = (limits[1] - limits[0] + 1) * 5
+            binwidth = (limits[1] - limits[0] + 1) / nbins
+            divider = make_axes_locatable(ax)
+
+            histX = divider.append_axes("top", 1.2, pad=0.15, sharex=ax)
+            histY = divider.append_axes("right", 1.2, pad=0.15, sharey=ax)
+
+            n, bins, patches = histX.hist(group['median_ndsi'], bins=nbins, color="#000000", alpha=0.66, edgecolor='none')
+            plt.setp(histX.get_xticklabels(), visible=False)
+            histX.set_ylabel("Count")
+            xyticks = histX.get_yticks()
+            xyticks = list(set([int(round(i, 0)) for i in xyticks]))
+            histX.set_yticks(xyticks)
+
+            smoothedbins = np.arange(limits[0], limits[1], 0.01)
+            kde = gaussian_kde(group['median_ndsi'])
+            kde.set_bandwidth(kde.factor * 0.75)
+            y = kde.evaluate(smoothedbins)
+            y = y / y.max() * n.max()
+            histX.plot(smoothedbins, y, 'k-')
+
+            n, bins, patches = histY.hist(group['pooled_ndsi'], bins=nbins, color="#000000", alpha=0.66, orientation='horizontal', edgecolor='none')
+            plt.setp(histY.get_yticklabels(), visible=False)
+            histY.set_xlabel("Count")
+            yxticks = histX.get_xticks()
+            yxticks = list(set([int(round(i, 0)) for i in yxticks]))
+            histY.set_xticks(xyticks)
+            kde = gaussian_kde(group['pooled_ndsi'])
+            kde.set_bandwidth(kde.factor * 0.75)
+            y = kde.evaluate(smoothedbins)
+            y = y / y.max() * n.max()
+            histY.plot(y, smoothedbins, 'k-')
+
+            ax.set_xlim(*limits)
+            ax.set_ylim(*limits)
+
+            fig.suptitle(code)
+
             pdf.savefig(bbox_inches='tight')
             plt.close()
     ctime2 = time.monotonic()
