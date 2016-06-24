@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 import Bio.Seq
 import Bio.Alphabet
 
-from .readcounter import PyReadCounter, PyExperiment, NDSIS
+from .readcounter import PyHammingReadCounter, PySeqlevReadCounter, PyExperiment, NDSIS
 from . import version
 
 def normalizeCounts(df, sortedcells):
