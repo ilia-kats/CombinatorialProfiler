@@ -219,9 +219,13 @@ def main():
         experiments.append(exp)
         logging.debug(json.dumps(exp, indent=4, cls=PyExperimentJSONEncoder))
 
-    counter = PyReadCounter(experiments, config.get('insert_mismatches', 0), config.get('barcode_length', 0), config.get('barcode_mismatches', 0))
-    logging.debug("Unique forward barcodes: %s" % json.dumps(counter.unique_forward_barcodes, indent=4))
-    logging.debug("Unique reverse barcodes: %s" % json.dumps(counter.unique_reverse_barcodes, indent=4))
+    insert_mismatches = config.get('insert_mismatches', 0)
+    if config.get('barcode_match_algo', 'hamming').lower() == 'seqlev':
+        counter = PySeqlevReadCounter(experiments, insert_mismatches, config.get('barcode_mismatches', 0))
+    else:
+        counter = PyReadCounter(experiments, insert_mismatches, config.get('barcode_length', 0), config.get('barcode_mismatches', 0))
+        logging.debug("Unique forward barcodes: %s" % json.dumps(counter.unique_forward_barcodes, indent=4))
+        logging.debug("Unique reverse barcodes: %s" % json.dumps(counter.unique_reverse_barcodes, indent=4))
 
     fqcoutdir = os.path.join(args.outdir,'fastqc')
     os.makedirs(fqcoutdir, exist_ok=True)

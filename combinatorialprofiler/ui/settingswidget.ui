@@ -6,106 +6,110 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>737</width>
+    <width>774</width>
     <height>391</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <layout class="QFormLayout" name="formLayout">
-   <property name="leftMargin">
-    <number>0</number>
-   </property>
-   <property name="topMargin">
-    <number>0</number>
-   </property>
-   <property name="rightMargin">
-    <number>0</number>
-   </property>
-   <property name="bottomMargin">
-    <number>0</number>
-   </property>
-   <item row="0" column="0">
-    <widget class="QLabel" name="label">
-     <property name="text">
-      <string>Allowed mismat&amp;ches in insert sequence:</string>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <layout class="QFormLayout" name="formLayout">
+     <property name="sizeConstraint">
+      <enum>QLayout::SetMinimumSize</enum>
      </property>
-     <property name="buddy">
-      <cstring>mismatches</cstring>
-     </property>
-    </widget>
+     <item row="2" column="0">
+      <widget class="QLabel" name="label_4">
+       <property name="text">
+        <string>Barcode matching algorithm:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="1">
+      <widget class="QComboBox" name="barcodeAlgo">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <item>
+        <property name="text">
+         <string>Hamming</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Seqlev</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="label">
+       <property name="text">
+        <string>Allowed mismat&amp;ches in insert sequence:</string>
+       </property>
+       <property name="buddy">
+        <cstring>mismatches</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1">
+      <widget class="QSpinBox" name="mismatches">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="suffix">
+        <string> base(s)</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
-   <item row="0" column="1">
-    <widget class="QSpinBox" name="mismatches">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="suffix">
-      <string> base(s)</string>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="0">
-    <widget class="QLabel" name="label_2">
-     <property name="text">
-      <string>Miminum length of generated uni&amp;que barcodes:</string>
-     </property>
-     <property name="buddy">
-      <cstring>barcodeLength</cstring>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="1">
-    <widget class="QSpinBox" name="barcodeLength">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="specialValueText">
-      <string>Don't generate unique barcodes</string>
-     </property>
-     <property name="suffix">
-      <string> base(s)</string>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="0">
-    <widget class="QLabel" name="label_3">
-     <property name="text">
-      <string>Maximum mismatched fraction of barcode sequence:</string>
-     </property>
-     <property name="buddy">
-      <cstring>barcodeMismatches</cstring>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="1">
-    <widget class="QDoubleSpinBox" name="barcodeMismatches">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="decimals">
-      <number>3</number>
-     </property>
-     <property name="maximum">
-      <double>0.500000000000000</double>
-     </property>
-     <property name="singleStep">
-      <double>0.050000000000000</double>
-     </property>
+   <item>
+    <widget class="QStackedWidget" name="barcodeAlgoSettings">
+     <widget class="BarcodeHammingWidget" name="hamming"/>
+     <widget class="BarcodeSeqlevWidget" name="seqlev"/>
     </widget>
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>BarcodeHammingWidget</class>
+   <extends>QWidget</extends>
+   <header>combinatorialprofiler.ui.barcodehammingwidget</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>BarcodeSeqlevWidget</class>
+   <extends>QWidget</extends>
+   <header>combinatorialprofiler.ui.barcodeseqlevwidget</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>barcodeAlgo</sender>
+   <signal>currentIndexChanged(int)</signal>
+   <receiver>barcodeAlgoSettings</receiver>
+   <slot>setCurrentIndex(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>563</x>
+     <y>78</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>386</x>
+     <y>291</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>
