@@ -3,7 +3,7 @@
 
 #include "ReadCounter.h"
 
-class HammingReadCounter : public ReadCounter<HammingBarcodeNode>
+class HammingReadCounter : public ReadCounter
 {
 public:
     static HammingReadCounter* getReadCounter(std::vector<Experiment*>, uint16_t insert_mismatches = 1, uint16_t unique_barcode_length = 0, float allowed_barcode_mismatches = 0);

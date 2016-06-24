@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 #include <utility>
-#include <numeric>
 
 class Experiment;
 
@@ -29,9 +28,6 @@ public:
 protected:
     template<class NeedleIt, class HaystackIt>
     static std::pair<std::string::size_type, std::string::size_type> fuzzy_find(NeedleIt nbegin, NeedleIt nend, HaystackIt hbegin, HaystackIt hend);
-
-    template<class NeedleIt, class HaystackIt>
-    static std::string::size_type hamming_distance(NeedleIt nbegin, NeedleIt nend, HaystackIt hbegin);
 };
 
 template<typename T>
@@ -76,9 +72,8 @@ class HammingBarcodeNode : public Node<float>, virtual public BarcodeNode
 public:
     typedef HammingBarcodeMatch match_type;
 
-    HammingBarcodeNode(std::string, float mismatches, std::vector<std::string>);
-
-    virtual HammingBarcodeMatch* match(Read&) const;
+    HammingBarcodeNode(std::string, float, std::vector<std::string>);
+    virtual match_type* match(Read&) const;
 
 protected:
     HammingBarcodeNode();
@@ -101,7 +96,39 @@ class DummyHammingBarcodeNode : virtual public HammingBarcodeNode, virtual publi
 {
 public:
     DummyHammingBarcodeNode();
-    virtual HammingBarcodeMatch *match(Read&) const;
+    virtual HammingBarcodeNode::match_type* match(Read&) const;
+};
+
+class SeqlevBarcodeNode : public Node<std::string::size_type>, virtual public BarcodeNode
+{
+public:
+    typedef SeqlevBarcodeMatch match_type;
+
+    SeqlevBarcodeNode(std::string, std::string::size_type);
+protected:
+    SeqlevBarcodeNode();
+    std::string m_sequence;
+};
+
+class FwSeqlevBarcodeNode : virtual public SeqlevBarcodeNode, virtual public FwBarcodeNode
+{
+public:
+    FwSeqlevBarcodeNode(std::string, std::string::size_type);
+    virtual match_type* match(Read&) const;
+};
+
+class RevSeqlevBarcodeNode : virtual public SeqlevBarcodeNode, virtual public RevBarcodeNode
+{
+public:
+    RevSeqlevBarcodeNode(std::string, std::string::size_type);
+    virtual match_type* match(Read&) const;
+};
+
+class DummySeqlevBarcodeNode : virtual public SeqlevBarcodeNode, virtual public FwBarcodeNode
+{
+public:
+    DummySeqlevBarcodeNode();
+    virtual SeqlevBarcodeNode::match_type* match(Read&) const;
 };
 
 class InsertNode : public Node<std::string::size_type>
@@ -110,7 +137,7 @@ public:
     typedef InsertMatch match_type;
 
     InsertNode(std::string, std::string::size_type mismatches);
-    virtual InsertMatch* match(Read&) const;
+    virtual match_type* match(Read&) const;
 
 private:
     std::string m_upstreamseq;

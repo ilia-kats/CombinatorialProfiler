@@ -1,7 +1,7 @@
 import random
 import time
 
-from combinatorialprofiler.readcounter import PyExperiment, PyReadCounter, make_unique
+from combinatorialprofiler.readcounter import PyExperiment, PyHammingReadCounter, PySeqlevReadCounter, make_unique
 
 class FastQCreator:
     nucleotides = ['A', 'T', 'C', 'G']
@@ -152,10 +152,10 @@ def simplecounts(tmpdir, mismatches):
         d['barcodes_fw'] = make_barcodes_dict(fq.fwcodes)
         d['barcodes_rev'] = make_barcodes_dict(fq.revcodes)
         exps.append(PyExperiment(str(i[0]), d))
-    counter = PyReadCounter(exps, mismatches, 1)
+    counter = PySeqlevReadCounter(exps, mismatches, 1)
 
     unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
-    counter.countReads(str(fq.file), str(unmatched), 4)
+    counter.countReads(str(fq.file), str(unmatched), 1)
 
     assert counter.read == fq.totalreads
     assert counter.counted == fq.totalreads
@@ -186,7 +186,7 @@ def test_namedinserts(tmpdir):
                 unmatched += counts
     d = {'insert': fq.inserts[0], 'barcodes_fw': make_barcodes_dict(fq.fwcodes), 'barcodes_rev': make_barcodes_dict(fq.revcodes), 'named_inserts': nins}
     exp = PyExperiment('test', d)
-    counter = PyReadCounter([exp], minlength=1)
+    counter = PyHammingReadCounter([exp], minlength=1)
 
     unmatcheddir = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
     counter.countReads(str(fq.file), str(unmatcheddir), 4)
@@ -212,7 +212,7 @@ def test_no_reverse_codes(tmpdir):
         PyExperiment("reduced", {'insert': fq.inserts[1], 'barcodes_fw': fwcodes, 'barcodes_rev': rc.revcodes_tokeep}),
         PyExperiment("norevcodes", {'insert': fq.inserts[1], 'barcodes_fw': fwcodes})
     ]
-    counter = PyReadCounter(exps, minlength=1)
+    counter = PyHammingReadCounter(exps, minlength=1)
     unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
     counter.countReads(str(fq.file), str(unmatched), 4)
     assert counter.read == fq.totalreads
@@ -231,7 +231,7 @@ def test_no_forward_codes(tmpdir):
         PyExperiment("reduced", {'insert': fq.inserts[1], 'barcodes_rev': revcodes, 'barcodes_fw': rc.fwcodes_tokeep}),
         PyExperiment("nofwcodes", {'insert': fq.inserts[1], 'barcodes_rev': revcodes})
     ]
-    counter = PyReadCounter(exps, minlength=1)
+    counter = PyHammingReadCounter(exps, minlength=1)
     unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
     counter.countReads(str(fq.file), str(unmatched), 4)
     assert counter.read == fq.totalreads
@@ -251,7 +251,7 @@ def test_no_forward_and_reverse_codes(tmpdir):
         PyExperiment("norevcodes", {'insert': fq.inserts[1], 'barcodes_fw': rc.fwcodes_tokeep}),
         PyExperiment("nofwrevcodes", {'insert': fq.inserts[1]})
     ]
-    counter = PyReadCounter(exps)
+    counter = PyHammingReadCounter(exps)
 
     unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
     counter.countReads(str(fq.file), str(unmatched), 4)
@@ -269,7 +269,7 @@ def test_unmatchable_inserts(tmpdir):
             nunmatched += c
 
     exps = [PyExperiment(str(i), {'insert': iseq, 'barcodes_fw': make_barcodes_dict(fq.fwcodes), 'barcodes_rev': make_barcodes_dict(fq.revcodes)}) for i, iseq in enumerate(fq.inserts[:-1])]
-    counter = PyReadCounter(exps, minlength=1)
+    counter = PyHammingReadCounter(exps, minlength=1)
 
     unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
     counter.countReads(str(fq.file), str(unmatched), 4)
@@ -293,7 +293,7 @@ def test_unmatchable_barcodes(tmpdir):
         rc = reduce_barcodes(fq, i, fwcodes, revcodes)
         nunmatched += sum(rc.totalcounts[1:])
     exps = [PyExperiment(str(i), {'insert': iseq, 'barcodes_fw': fwcodes, 'barcodes_rev': revcodes}) for i, iseq in enumerate(fq.inserts)]
-    counter = PyReadCounter(exps, minlength=1)
+    counter = PyHammingReadCounter(exps, minlength=1)
 
     unmatched = tmpdir.mkdir("%s_unmatched" % fq.file.basename)
     counter.countReads(str(fq.file), str(unmatched), 4)

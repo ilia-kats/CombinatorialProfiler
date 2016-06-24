@@ -29,6 +29,7 @@ class debugmode(develop):
         import os.path
         global readcounter
         readcounter.extra_compile_args.append("-O0")
+        readcounter.undef_macros = ['NDEBUG']
 
         print(readcounter.sources)
         cythonfile = readcounter.sources.index(readcounter_basepath + "readcounter.cpp")

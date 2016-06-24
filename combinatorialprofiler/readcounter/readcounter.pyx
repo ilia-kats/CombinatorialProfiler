@@ -8,6 +8,7 @@ from libcpp.string cimport string
 from libcpp.vector cimport vector
 from libcpp.utility cimport pair
 from libcpp.memory cimport shared_ptr
+from libcpp cimport bool
 from libc.stdint cimport *
 
 import pandas as pd
@@ -19,6 +20,7 @@ cdef extern from "Node.h" nogil:
 cdef extern from "util.h" nogil:
     ctypedef unordered_map[string, vector[string]] UniqueBarcodes
     UniqueBarcodes makeUnique(unordered_set[string], uint16_t)
+    size_t seqlev_distance(string, string, bool)
 
 cdef extern from "Experiment.h" nogil:
     ctypedef unordered_map[string, unordered_set[string]] InsertSet
@@ -47,7 +49,7 @@ cdef extern from "Experiment.h" nogil:
         Counts counts
 
 cdef extern from "ReadCounter.h" nogil:
-    cdef cppclass ReadCounter[BarcodeNodeBase]:
+    cdef cppclass ReadCounter:
         ReadCounter(vector[Experiment*], uint16_t mismatches) except+
         void countReads(const string&, const string&, int)
         uint16_t allowedMismatches()
@@ -60,13 +62,19 @@ cdef extern from "ReadCounter.h" nogil:
         uint64_t written()
 
 cdef extern from "HammingReadCounter.h" nogil:
-    cdef cppclass HammingReadCounter(ReadCounter[HammingBarcodeNode]):
+    cdef cppclass HammingReadCounter(ReadCounter):
         @staticmethod
         HammingReadCounter* getReadCounter(vector[Experiment*], uint16_t mismatches, uint16_t unique_barcode_length, float allowed_barcode_mismatches) except+
         uint16_t minimumUniqueBarcodeLength()
         float allowedBarcodeMismatches()
         unordered_map[string, UniqueBarcodes] uniqueForwardBarcodes()
         unordered_map[string, UniqueBarcodes] uniqueReverseBarcodes()
+
+cdef extern from "SeqlevReadCounter.h" nogil:
+    cdef cppclass SeqlevReadCounter(ReadCounter):
+        @staticmethod
+        SeqlevReadCounter* getReadCounter(vector[Experiment*], uint16_t mismatches, uint16_t barcode_mismatches) except+
+        uint16_t allowedBarcodeMismatches()
 
 cdef class PyExperiment:
     cdef Experiment *_exprmnt
@@ -205,17 +213,15 @@ def make_unique(barcodes, int minlength=0):
         codes.insert(c.encode())
     return makeUnique(codes, minlength);
 
+def seqLevDistance(str needle, str haystack, at_end=False):
+    return seqlev_distance(needle.encode(), haystack.encode(), at_end)
+
 cdef class PyReadCounter:
-    cdef HammingReadCounter *_rdcntr
+    cdef ReadCounter *_rdcntr
     cdef list _exprmnts
 
-    def __cinit__(self, list experiments, int mismatches=1, int minlength=0, float barcode_mismatches=0):
-        cdef vector[Experiment*] vec
-        cdef PyExperiment exp;
+    def __cinit__(self, list experiments, *args, **kwargs):
         self._exprmnts = experiments
-        for exp in self._exprmnts:
-            vec.push_back((<PyExperiment>exp)._exprmnt)
-        self._rdcntr = HammingReadCounter.getReadCounter(vec, mismatches, minlength, barcode_mismatches)
 
     def __dealloc__(self):
         del self._rdcntr
@@ -229,10 +235,6 @@ cdef class PyReadCounter:
     @property
     def allowed_mismatches(self):
         return self._rdcntr.allowedMismatches()
-
-    @property
-    def allowed_barcode_mismatches(self):
-        return self._rdcntr.allowedBarcodeMismatches()
 
     @property
     def read(self):
@@ -262,11 +264,39 @@ cdef class PyReadCounter:
     def written(self):
         return self._rdcntr.written()
 
+cdef class PyHammingReadCounter(PyReadCounter):
+    def __cinit__(self, list experiments, int mismatches=1, int minlength=0, float barcode_mismatches=0):
+        cdef vector[Experiment*] vec
+        cdef PyExperiment exp;
+        for exp in self._exprmnts:
+            vec.push_back((<PyExperiment>exp)._exprmnt)
+        self._rdcntr = HammingReadCounter.getReadCounter(vec, mismatches, minlength, barcode_mismatches)
+
+    @property
+    def minimum_unique_barcode_length(self):
+        return (<HammingReadCounter*>self._rdcntr).minimumUniqueBarcodeLength()
+
+    @property
+    def allowed_barcode_mismatches(self):
+        return (<HammingReadCounter*>self._rdcntr).allowedBarcodeMismatches()
+
     @property
     def unique_forward_barcodes(self):
-        return self._rdcntr.uniqueForwardBarcodes()
+        return (<HammingReadCounter*>self._rdcntr).uniqueForwardBarcodes()
 
     @property
     def unique_reverse_barcodes(self):
-        return self._rdcntr.uniqueReverseBarcodes()
+        return (<HammingReadCounter*>self._rdcntr).uniqueReverseBarcodes()
+
+cdef class PySeqlevReadCounter(PyReadCounter):
+    def __cinit__(self, list experiments, int mismatches=1, int barcode_mismatches=0):
+        cdef vector[Experiment*] vec
+        cdef PyExperiment exp;
+        for exp in self._exprmnts:
+            vec.push_back((<PyExperiment>exp)._exprmnt)
+        self._rdcntr = SeqlevReadCounter.getReadCounter(vec, mismatches, barcode_mismatches)
+
+    @property
+    def allowed_barcode_mismatches(self):
+        return (<SeqlevReadCounter*>self._rdcntr).allowedBarcodeMismatches()
 

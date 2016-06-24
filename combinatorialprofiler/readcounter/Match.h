@@ -5,6 +5,7 @@
 
 class NodeBase;
 class HammingBarcodeNode;
+class SeqlevBarcodeNode;
 class InsertNode;
 
 class MatchBase
@@ -17,6 +18,7 @@ public:
     operator bool() const;
 
     const NodeBase* node() const;
+    virtual bool perfectMatch() const = 0;
 
 protected:
     const NodeBase *m_node;
@@ -28,6 +30,8 @@ class Match : public MatchBase
 {
 public:
     virtual ~Match();
+
+    virtual bool perfectMatch() const;
 
     template<typename S>
     friend bool operator<(const Match<S> &l, const Match<S> &r);
@@ -54,10 +58,18 @@ class HammingBarcodeMatch : public Match<float>
 {
 public:
     HammingBarcodeMatch(const HammingBarcodeNode*, std::string::size_type, std::string::size_type);
+    HammingBarcodeMatch(const HammingBarcodeNode*);
 
 private:
     std::string::size_type m_matchedLength;
     std::string::size_type m_actualMismatches;
+};
+
+class SeqlevBarcodeMatch : public Match<std::string::size_type>
+{
+public:
+    SeqlevBarcodeMatch(const SeqlevBarcodeNode*, std::string::size_type);
+    SeqlevBarcodeMatch(const SeqlevBarcodeNode*);
 };
 
 class InsertMatch : public Match<std::string::size_type>

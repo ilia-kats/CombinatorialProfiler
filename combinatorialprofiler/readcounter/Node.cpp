@@ -33,17 +33,6 @@ std::pair<std::string::size_type, std::string::size_type> NodeBase::fuzzy_find(N
     return bestMatch;
 }
 
-template<class NeedleIt, class HaystackIt>
-std::string::size_type NodeBase::hamming_distance(NeedleIt nbegin, NeedleIt nend, HaystackIt hbegin)
-{
-    return std::inner_product(nbegin,
-                              nend,
-                              hbegin,
-                              static_cast<std::string::size_type>(0),
-                              std::plus<std::string::size_type>(),
-                               [](const typename decltype(nbegin)::value_type &n, const typename decltype(hbegin)::value_type &h) -> bool {return static_cast<bool>(n ^ h);});
-}
-
 std::string::const_iterator FwBarcodeNode::getReadPart(const Read &rd, std::string::size_type l) const
 {
     return rd.getSequence().cbegin();
@@ -62,7 +51,7 @@ HammingBarcodeNode::HammingBarcodeNode()
 : Node(dummykey, 0)
 {}
 
-HammingBarcodeMatch* HammingBarcodeNode::match(Read &rd) const
+HammingBarcodeNode::match_type* HammingBarcodeNode::match(Read &rd) const
 {
     std::pair<decltype(m_uniqueSequences)::size_type, std::string::size_type> bestFind(0, SIZE_MAX);
     if (!m_allowedMismatches){
@@ -103,9 +92,49 @@ RevHammingBarcodeNode::RevHammingBarcodeNode(std::string fullseq, float mismatch
 DummyHammingBarcodeNode::DummyHammingBarcodeNode()
 {}
 
-HammingBarcodeMatch* DummyHammingBarcodeNode::match(Read &rd) const
+HammingBarcodeNode::match_type* DummyHammingBarcodeNode::match(Read &rd) const
 {
-    return new HammingBarcodeMatch(this, SIZE_MAX, 0);
+    return new HammingBarcodeMatch(this);
+}
+
+SeqlevBarcodeNode::SeqlevBarcodeNode(std::string fullseq, std::string::size_type mismatches)
+: Node(std::move(fullseq), mismatches), m_sequence(sequence)
+{}
+
+SeqlevBarcodeNode::SeqlevBarcodeNode()
+: Node(dummykey, 0)
+{}
+
+SeqlevBarcodeNode::match_type* FwSeqlevBarcodeNode::match(Read &rd) const
+{
+    auto length = m_sequence.size() + allowedMismatches();
+    auto tomatch = getReadPart(rd, length); // account for insertions
+    return new SeqlevBarcodeMatch(this, seqlev_distance(m_sequence.cbegin(), m_sequence.cend(), tomatch, tomatch + length));
+}
+
+FwSeqlevBarcodeNode::FwSeqlevBarcodeNode(std::string fullseq, std::string::size_type mismatches)
+: SeqlevBarcodeNode(std::move(fullseq), mismatches)
+{}
+
+RevSeqlevBarcodeNode::RevSeqlevBarcodeNode(std::string fullseq, std::string::size_type mismatches)
+: SeqlevBarcodeNode(std::move(fullseq), mismatches)
+{
+    m_sequence = revCompl(m_sequence);
+}
+
+SeqlevBarcodeNode::match_type* RevSeqlevBarcodeNode::match(Read &rd) const
+{
+    auto length = m_sequence.size() + allowedMismatches();
+    auto tomatch = getReadPart(rd, length); // account for insertions
+    return new SeqlevBarcodeMatch(this, seqlev_distance_end(m_sequence.cbegin(), m_sequence.cend(), tomatch, tomatch + length));
+}
+
+DummySeqlevBarcodeNode::DummySeqlevBarcodeNode()
+{}
+
+SeqlevBarcodeNode::match_type* DummySeqlevBarcodeNode::match(Read &rd) const
+{
+    return new SeqlevBarcodeMatch(this);
 }
 
 InsertNode::InsertNode(std::string seq, std::string::size_type mismatches)
@@ -121,7 +150,7 @@ InsertNode::InsertNode(std::string seq, std::string::size_type mismatches)
     m_downstreamseq = sequence.substr(insert_end + 1, std::string::npos);
 }
 
-InsertMatch* InsertNode::match(Read &read) const
+InsertNode::match_type* InsertNode::match(Read &read) const
 {
     decltype(m_upstreamseq)::size_type start, end;
     std::string::size_type mismatches_cnt = 0;
