@@ -244,8 +244,12 @@ void ReadCounter::matchRead(ThreadSynchronization *sync)
                     if (*bn && best && *bn < *best) {
                         delete best;
                         best = bn;
+                        if (best->perfectMatch())
+                            break;
                     } else if (*bn && !best) {
                         best = bn;
+                        if (best->perfectMatch())
+                            break;
                     } else
                         delete bn;
                 }
