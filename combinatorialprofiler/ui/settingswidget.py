@@ -27,6 +27,8 @@ class SettingsWidget(QWidget):
         self.ui.hamming.changed.connect(self.changed)
         self.ui.seqlev.changed.connect(self.changed)
 
+        self.ui.barcodeAlgoSettings.setCurrentIndex(self.ui.barcodeAlgo.currentIndex())
+
     def serialize(self):
         d = {"insert_mismatches" : self.ui.mismatches.value(), "barcode_match_algo" : str(self.BarcodeAlgo(self.ui.barcodeAlgo.currentIndex()))}
         d.update(self.ui.barcodeAlgoSettings.currentWidget().serialize())
