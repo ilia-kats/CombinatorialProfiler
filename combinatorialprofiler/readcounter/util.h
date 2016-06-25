@@ -46,6 +46,8 @@ std::string::size_type hamming_distance(NeedleIt nbegin, NeedleIt nend, Haystack
                               std::plus<std::string::size_type>(), std::not_equal_to<typename NeedleIt::value_type>());
 }
 
+std::string::size_type hamming_distance(const std::string&, const std::string&);
+
 template<class NeedleIt, class HaystackIt>
 std::string::size_type seqlev_distance(NeedleIt nbegin, NeedleIt nend, HaystackIt hbegin)
 {

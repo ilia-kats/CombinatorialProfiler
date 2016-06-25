@@ -13,13 +13,10 @@ from libc.stdint cimport *
 
 import pandas as pd
 
-cdef extern from "Node.h" nogil:
-    cdef cppclass HammingBarcodeNode:
-        HammingBarcodeNode(string, float, vector[string]) except+
-
 cdef extern from "util.h" nogil:
     ctypedef unordered_map[string, vector[string]] UniqueBarcodes
     UniqueBarcodes makeUnique(unordered_set[string], uint16_t)
+    size_t hamming_distance(string, string)
     size_t seqlev_distance(string, string, bool)
 
 cdef extern from "Experiment.h" nogil:
@@ -212,6 +209,9 @@ def make_unique(barcodes, int minlength=0):
     for c in barcodes:
         codes.insert(c.encode())
     return makeUnique(codes, minlength);
+
+def hammingDistance(str needle, str haystack):
+    return hamming_distance(needle.encode(), haystack.encode())
 
 def seqLevDistance(str needle, str haystack, at_end=False):
     return seqlev_distance(needle.encode(), haystack.encode(), at_end)

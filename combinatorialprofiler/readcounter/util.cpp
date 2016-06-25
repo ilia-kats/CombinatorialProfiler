@@ -65,6 +65,14 @@ namespace std
     }
 }
 
+std::string::size_type hamming_distance(const std::string &needle, const std::string &haystack)
+{
+    if (haystack.size() < needle.size())
+        return hamming_distance(haystack.cbegin(), haystack.cend(), needle.cbegin());
+    else
+        return hamming_distance(needle.cbegin(), needle.cend(), haystack.cbegin());
+}
+
 std::string::size_type seqlev_distance(const std::string &needle, const std::string &haystack, bool at_end)
 {
     if (at_end)
