@@ -7,6 +7,8 @@ from PyQt5 import uic
 
 from enum import Enum
 
+from .columnresizer import ColumnResizer
+
 class SettingsWidget(QWidget):
     ui = uic.loadUiType(resource_stream(__name__, "settingswidget.ui"))
 
@@ -28,6 +30,11 @@ class SettingsWidget(QWidget):
         self.ui.seqlev.changed.connect(self.changed)
 
         self.ui.barcodeAlgoSettings.setCurrentIndex(self.ui.barcodeAlgo.currentIndex())
+
+        self.resizer = ColumnResizer(self)
+        self.resizer.addWidgetsFromLayout(self.ui.formLayout, 0)
+        self.resizer.addWidgetsFromLayout(self.ui.hamming.layout(), 0)
+        self.resizer.addWidgetsFromLayout(self.ui.seqlev.layout(), 0)
 
     def serialize(self):
         d = {"insert_mismatches" : self.ui.mismatches.value(), "barcode_match_algo" : str(self.BarcodeAlgo(self.ui.barcodeAlgo.currentIndex()))}
