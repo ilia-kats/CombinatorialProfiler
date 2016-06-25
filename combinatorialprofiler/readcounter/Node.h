@@ -148,6 +148,7 @@ protected:
     std::string m_upstreamseq;
     std::string m_downstreamseq;
     std::string::size_type m_insertlength;
+    std::string::size_type m_minReadLength;
 
     match_type* getMatch(const Read&, std::string::size_type, std::string::size_type, std::string::size_type) const;
 };
@@ -176,25 +177,27 @@ typename HammingBarcodeNode<T>::match_type* HammingBarcodeNode<T>::match(Read &r
 {
     const T* cthis = static_cast<const T*>(this);
     std::pair<typename decltype(m_uniqueSequences)::size_type, std::string::size_type> bestFind(0, SIZE_MAX);
-    if (!m_allowedMismatches){
-        for (const auto &seq : m_uniqueSequences) {
-            auto tomatch = cthis->getIterators(seq, rd, seq.size());
-            if (std::equal(std::get<0>(tomatch), std::get<1>(tomatch), std::get<2>(tomatch)))
-                return new HammingBarcodeMatch<T>(this, seq.size(), 0);
-        }
-    } else {
-        auto it = m_uniqueSequences.cbegin();
-        for (typename decltype(m_uniqueSequences)::size_type i = 0; i < m_uniqueSequences.size(); ++i, ++it) {
-            auto tomatch = cthis->getIterators(*it, rd, it->size());
-            auto found = hamming_distance(tomatch[0], tomatch[1], tomatch[2]);
-            if (found < bestFind.second) {
-                bestFind.first = i;
-                bestFind.second = found;
+    if (rd.length() > sequence.size()) {
+        if (!m_allowedMismatches){
+            for (const auto &seq : m_uniqueSequences) {
+                auto tomatch = cthis->getIterators(seq, rd, seq.size());
+                if (std::equal(std::get<0>(tomatch), std::get<1>(tomatch), std::get<2>(tomatch)))
+                    return new HammingBarcodeMatch<T>(this, seq.size(), 0);
             }
-            if (!found)
-                break;
-        }
+        } else {
+            auto it = m_uniqueSequences.cbegin();
+            for (typename decltype(m_uniqueSequences)::size_type i = 0; i < m_uniqueSequences.size(); ++i, ++it) {
+                auto tomatch = cthis->getIterators(*it, rd, it->size());
+                auto found = hamming_distance(tomatch[0], tomatch[1], tomatch[2]);
+                if (found < bestFind.second) {
+                    bestFind.first = i;
+                    bestFind.second = found;
+                }
+                if (!found)
+                    break;
+            }
 
+        }
     }
     return new HammingBarcodeMatch<T>(this, m_uniqueSequences[bestFind.first].size(), bestFind.second);
 }
@@ -217,7 +220,9 @@ SeqlevBarcodeNode<T>::SeqlevBarcodeNode()
 template<class T>
 typename SeqlevBarcodeNode<T>::match_type* SeqlevBarcodeNode<T>::match(Read &rd) const
 {
-    auto length = m_sequence.size() + allowedMismatches(); // account for insertions
+    if (rd.length() < m_sequence.size())
+        return new SeqlevBarcodeMatch<T>(this, SIZE_MAX);
+    auto length = std::min(rd.length(), m_sequence.size() + allowedMismatches()); // account for insertions
     auto tomatch = static_cast<const T*>(this)->getIterators(m_sequence, rd, length);
     return new SeqlevBarcodeMatch<T>(this, seqlev_distance(std::get<0>(tomatch), std::get<1>(tomatch), std::get<2>(tomatch), std::get<3>(tomatch), m_sequence.size(), length));
 }

@@ -42,40 +42,6 @@ std::array<std::string::const_reverse_iterator, 4> RevBarcodeNode::getIterators(
 {
     return {seq.crbegin(), seq.crend(), rd.getSequence().crbegin(), rd.getSequence().crbegin() + l};
 }
-/*
-HammingBarcodeNode::HammingBarcodeNode(std::string fullseq, float mismatches, std::vector<std::string> uniqueSeqs)
-: Node(std::move(fullseq), mismatches), m_uniqueSequences(std::move(uniqueSeqs))
-{}
-
-HammingBarcodeNode::HammingBarcodeNode()
-: Node(dummykey, 0)
-{}
-
-HammingBarcodeNode::match_type* HammingBarcodeNode::match(Read &rd) const
-{
-    std::pair<decltype(m_uniqueSequences)::size_type, std::string::size_type> bestFind(0, SIZE_MAX);
-    if (!m_allowedMismatches){
-        for (const auto &seq : m_uniqueSequences) {
-            auto tomatch = getIterators(seq, rd, seq.size());
-            if (std::equal(std::get<0>(tomatch), std::get<1>(tomatch), std::get<2>(tomatch))
-                return new HammingBarcodeMatch(this, seq.size(), 0);
-        }
-    } else {
-        auto it = m_uniqueSequences.cbegin();
-        for (decltype(m_uniqueSequences)::size_type i = 0; i < m_uniqueSequences.size(); ++i, ++it) {
-            auto tomatch = getIterators(*it, rd, it->size());
-            auto found = hamming_distance(tomatch[0], tomatch[1], tomatch[2]);
-            if (found < bestFind.second) {
-                bestFind.first = i;
-                bestFind.second = found;
-            }
-            if (!found)
-                break;
-        }
-
-    }
-    return new HammingBarcodeMatch(this, m_uniqueSequences[bestFind.first].size(), bestFind.second);
-}*/
 
 FwHammingBarcodeNode::FwHammingBarcodeNode(std::string fullseq, float mismatches, std::vector<std::string> uniqueSeqs)
 : HammingBarcodeNode(std::move(fullseq), mismatches, std::move(uniqueSeqs))
@@ -96,21 +62,6 @@ HammingBarcodeNode<DummyHammingBarcodeNode>::match_type* DummyHammingBarcodeNode
 {
     return new HammingBarcodeMatch<DummyHammingBarcodeNode>(this);
 }
-
-// SeqlevBarcodeNode::SeqlevBarcodeNode(std::string fullseq, std::string::size_type mismatches)
-// : Node(std::move(fullseq), mismatches), m_sequence(sequence)
-// {}
-//
-// SeqlevBarcodeNode::SeqlevBarcodeNode()
-// : Node(dummykey, 0)
-// {}
-//
-// SeqlevBarcodeNode::match_type* SeqlevBarcodeNode::match(Read &rd) const
-// {
-//     auto length = m_sequence.size() + allowedMismatches(); // account for insertions
-//     auto tomatch = getIterators(m_sequence, rd, length);
-//     return new SeqlevBarcodeMatch(this, seqlev_distance(std::get<0>(tomatch), std::get<1>(tomatch), std::get<2>(tomatch), std::get<3>(tomatch));
-// }
 
 FwSeqlevBarcodeNode::FwSeqlevBarcodeNode(std::string fullseq, std::string::size_type mismatches)
 : SeqlevBarcodeNode(std::move(fullseq), mismatches)
@@ -141,6 +92,7 @@ InsertNode::InsertNode(std::string seq, std::string::size_type mismatches)
     m_insertlength = insert_end - insert_start + 1;
     m_upstreamseq = sequence.substr(0, insert_start);
     m_downstreamseq = sequence.substr(insert_end + 1, std::string::npos);
+    m_minReadLength = m_insertlength + m_upstreamseq.size() + m_downstreamseq.size();
 }
 
 InsertNode::match_type* InsertNode::getMatch(const Read &rd, std::string::size_type start, std::string::size_type end, std::string::size_type mismatches) const
@@ -157,6 +109,8 @@ ExactMatchingInsertNode::ExactMatchingInsertNode(std::string seq)
 
 InsertNode::match_type* ExactMatchingInsertNode::match(Read &read) const
 {
+    if (read.length() < m_minReadLength)
+        return new InsertMatch(this, false);
     auto start = read.getSequence().find(m_upstreamseq);
     if (start == decltype(m_upstreamseq)::npos) {
         read = read.reverseComplement();
@@ -173,6 +127,8 @@ InsertNode::match_type* ExactMatchingInsertNode::match(Read &read) const
 
 InsertNode::match_type* HammingMatchingInsertNode::match(Read &read) const
 {
+    if (read.length() < m_minReadLength)
+        return new InsertMatch(this, false);
     decltype(m_upstreamseq)::size_type start, end;
     std::string::size_type mismatches_cnt = 0;
 

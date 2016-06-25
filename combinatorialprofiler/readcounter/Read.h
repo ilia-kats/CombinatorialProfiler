@@ -24,12 +24,14 @@ public:
     const std::string& getQuality() const;
 
     Read reverseComplement() const;
+    std::string::size_type length() const;
 
 private:
     std::string m_name;
     std::string m_sequence;
     std::string m_description;
     std::string m_quality;
+    std::string::size_type m_length;
 };
 
 #endif

@@ -8,15 +8,15 @@ Read::Read(std::string name)
 {}
 
 Read::Read(std::string name, std::string sequence)
-: m_name(std::move(name)), m_sequence(std::move(sequence))
+: m_name(std::move(name)), m_sequence(std::move(sequence)), m_length(m_sequence.size())
 {}
 
 Read::Read(std::string name, std::string sequence, std::string description)
-: m_name(std::move(name)), m_sequence(std::move(sequence)), m_description(std::move(description))
+: m_name(std::move(name)), m_sequence(std::move(sequence)), m_description(std::move(description)), m_length(m_sequence.size())
 {}
 
 Read::Read(std::string name, std::string sequence, std::string description, std::string quality)
-: m_name(std::move(name)), m_sequence(std::move(sequence)), m_description(std::move(description)), m_quality(std::move(quality))
+: m_name(std::move(name)), m_sequence(std::move(sequence)), m_description(std::move(description)), m_quality(std::move(quality)), m_length(m_sequence.size())
 {}
 
 void Read::setName(std::string name)
@@ -31,6 +31,7 @@ const std::string& Read::getName() const
 void Read::setSequence(std::string sequence)
 {
     m_sequence = std::move(sequence);
+    m_length = m_sequence.size();
 }
 const std::string& Read::getSequence() const
 {
@@ -61,4 +62,9 @@ Read Read::reverseComplement() const
     qual.reserve(m_quality.size());
     std::copy(m_quality.crbegin(), m_quality.crend(), std::inserter(qual, qual.begin()));
     return Read(m_name, revCompl(m_sequence), m_description, qual);
+}
+
+std::string::size_type Read::length() const
+{
+    return m_length;
 }
