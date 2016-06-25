@@ -170,7 +170,7 @@ def plot_correlations(df, nspec, limits, filename, experiment):
             histY = divider.append_axes("right", 1.2, pad=0.2, sharey=ax)
 
 
-            n, bins, patches = histX.hist(group['median_ndsi'], bins=nbins, normed=True, color="#000000", alpha=0.66, edgecolor='none')
+            n, bins, patches = histX.hist(group['median_ndsi'], bins=nbins, range=limits, normed=True, color="#000000", alpha=0.66, edgecolor='none')
             plt.setp(histX.get_xticklabels(), visible=False)
             histX.set_ylabel("Frequency")
 
@@ -182,7 +182,7 @@ def plot_correlations(df, nspec, limits, filename, experiment):
             histX.plot(smoothedbins, y, 'k-')
             histX.locator_params('y', nbins=3)
 
-            n, bins, patches = histY.hist(group['pooled_ndsi'], bins=nbins, normed=True, color="#000000", alpha=0.66, orientation='horizontal', edgecolor='none')
+            n, bins, patches = histY.hist(group['pooled_ndsi'], bins=nbins, range=limits, normed=True, color="#000000", alpha=0.66, orientation='horizontal', edgecolor='none')
             plt.setp(histY.get_yticklabels(), visible=False)
             histY.set_xlabel("Frequency")
             kde = gaussian_kde(group['pooled_ndsi'])
