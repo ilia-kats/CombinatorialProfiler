@@ -28,7 +28,7 @@ from .readcounter import PyHammingReadCounter, PySeqlevReadCounter, PyExperiment
 from . import version
 
 def normalizeCounts(df, sortedcells):
-    categories = (df['experiment'].cat.categories, df['barcode_fw'].cat.categories, df['barcode_rev'].cat.categories)
+    categories = (df['experiment'].cat.categories.sort_values(), df['barcode_fw'].cat.categories.sort_values(), df['barcode_rev'].cat.categories.sort_values())
     df = df.set_index(['experiment','barcode_fw', 'barcode_rev','sequence'])
     df['normalized_counts'] = (df['counts'] / df.groupby(level=['barcode_fw', 'barcode_rev'])['counts'].transform(sum)).unstack(['experiment','sequence']).mul(sortedcells, axis=0).stack(['experiment','sequence']).reorder_levels(df.index.names).dropna()
     df = df.reset_index()
