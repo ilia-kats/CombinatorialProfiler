@@ -153,6 +153,7 @@ def plot_correlations(df, nspec, limits, filename, experiment):
             c = group['median_ndsi'].corr(group['pooled_ndsi'], method='spearman')
 
             fig = plt.figure(figsize=(7,7))
+
             ax = fig.add_subplot(1,1,1)
             ax.scatter(group['median_ndsi'], group['pooled_ndsi'], s=100, c="#000000", alpha=1/3, marker='.', edgecolor='none')
 
@@ -165,40 +166,36 @@ def plot_correlations(df, nspec, limits, filename, experiment):
             binwidth = (limits[1] - limits[0] + 1) / nbins
             divider = make_axes_locatable(ax)
 
-            histX = divider.append_axes("top", 1.2, pad=0.15, sharex=ax)
-            histY = divider.append_axes("right", 1.2, pad=0.15, sharey=ax)
+            histX = divider.append_axes("top", 1.2, pad=0.2, sharex=ax)
+            histY = divider.append_axes("right", 1.2, pad=0.2, sharey=ax)
 
-            n, bins, patches = histX.hist(group['median_ndsi'], bins=nbins, color="#000000", alpha=0.66, edgecolor='none')
+
+            n, bins, patches = histX.hist(group['median_ndsi'], bins=nbins, normed=True, color="#000000", alpha=0.66, edgecolor='none')
             plt.setp(histX.get_xticklabels(), visible=False)
-            histX.set_ylabel("Count")
-            xyticks = histX.get_yticks()
-            xyticks = list(set([int(round(i, 0)) for i in xyticks]))
-            histX.set_yticks(xyticks)
+            histX.set_ylabel("Frequency")
 
             smoothedbins = np.arange(limits[0], limits[1], 0.01)
             kde = gaussian_kde(group['median_ndsi'])
             kde.set_bandwidth(kde.factor * 0.75)
             y = kde.evaluate(smoothedbins)
-            y = y / y.max() * n.max()
+            #y = y / y.max() * n.max()
             histX.plot(smoothedbins, y, 'k-')
+            histX.locator_params('y', nbins=3)
 
-            n, bins, patches = histY.hist(group['pooled_ndsi'], bins=nbins, color="#000000", alpha=0.66, orientation='horizontal', edgecolor='none')
+            n, bins, patches = histY.hist(group['pooled_ndsi'], bins=nbins, normed=True, color="#000000", alpha=0.66, orientation='horizontal', edgecolor='none')
             plt.setp(histY.get_yticklabels(), visible=False)
-            histY.set_xlabel("Count")
-            yxticks = histX.get_xticks()
-            yxticks = list(set([int(round(i, 0)) for i in yxticks]))
-            histY.set_xticks(xyticks)
+            histY.set_xlabel("Frequency")
             kde = gaussian_kde(group['pooled_ndsi'])
             kde.set_bandwidth(kde.factor * 0.75)
             y = kde.evaluate(smoothedbins)
-            y = y / y.max() * n.max()
+            #y = y / y.max() * n.max()
             histY.plot(y, smoothedbins, 'k-')
+            histY.locator_params('x', nbins=3)
 
             ax.set_xlim(*limits)
             ax.set_ylim(*limits)
 
-            fig.suptitle(code)
-
+            fig.suptitle(code, y=0.93)
             pdf.savefig(bbox_inches='tight')
             plt.close()
     ctime2 = time.monotonic()
