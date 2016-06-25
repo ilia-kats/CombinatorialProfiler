@@ -3,12 +3,18 @@
 
 #include "Read.h"
 #include "Match.h"
+#include "util.h"
 
 #include <string>
 #include <vector>
 #include <utility>
+#include <array>
 
 class Experiment;
+class MatchBase;
+class InsertMatch;
+
+extern std::string node_dummykey;
 
 class NodeBase
 {
@@ -49,86 +55,85 @@ protected:
     T m_allowedMismatches;
 };
 
-class BarcodeNode
-{
-protected:
-    virtual std::string::const_iterator getReadPart(const Read&, std::string::size_type) const = 0;
-};
 
-class FwBarcodeNode : virtual public BarcodeNode
-{
-protected:
-    virtual std::string::const_iterator getReadPart(const Read&, std::string::size_type) const;
-};
-
-class RevBarcodeNode : virtual public BarcodeNode
-{
-protected:
-    virtual std::string::const_iterator getReadPart(const Read&, std::string::size_type) const;
-};
-
-class HammingBarcodeNode : public Node<float>, virtual public BarcodeNode
+class FwBarcodeNode
 {
 public:
-    typedef HammingBarcodeMatch match_type;
+    virtual std::array<std::string::const_iterator, 4> getIterators(const std::string&, const Read&, std::string::size_type) const;
+};
 
-    HammingBarcodeNode(std::string, float, std::vector<std::string>);
-    virtual match_type* match(Read&) const;
+class RevBarcodeNode
+{
+public:
+    virtual std::array<std::string::const_reverse_iterator, 4> getIterators(const std::string&, const Read&, std::string::size_type) const;
+};
+
+template<class T>
+class HammingBarcodeNode : public Node<float>
+{
+public:
+    typedef HammingBarcodeMatch<T> match_type;
+
+    HammingBarcodeNode(std::string fullseq, float mismatches, std::vector<std::string> uniqueSeqs);
+
+    virtual match_type* match(Read &rd) const;
 
 protected:
     HammingBarcodeNode();
     std::vector<std::string> m_uniqueSequences;
 };
 
-class FwHammingBarcodeNode : virtual public HammingBarcodeNode, virtual public FwBarcodeNode
+class FwHammingBarcodeNode : public HammingBarcodeNode<FwHammingBarcodeNode>, public FwBarcodeNode
 {
 public:
     FwHammingBarcodeNode(std::string, float mismatches, std::vector<std::string>);
 };
 
-class RevHammingBarcodeNode: virtual public HammingBarcodeNode, virtual public RevBarcodeNode
+class RevHammingBarcodeNode: public HammingBarcodeNode<RevHammingBarcodeNode>, public RevBarcodeNode
 {
 public:
     RevHammingBarcodeNode(std::string, float mismatches, std::vector<std::string>);
 };
 
-class DummyHammingBarcodeNode : virtual public HammingBarcodeNode, virtual public FwBarcodeNode
+class DummyHammingBarcodeNode : public HammingBarcodeNode<DummyHammingBarcodeNode>, public FwBarcodeNode
 {
 public:
     DummyHammingBarcodeNode();
-    virtual HammingBarcodeNode::match_type* match(Read&) const;
+    virtual HammingBarcodeNode<DummyHammingBarcodeNode>::match_type* match(Read&) const;
 };
 
-class SeqlevBarcodeNode : public Node<std::string::size_type>, virtual public BarcodeNode
+template<class T>
+class SeqlevBarcodeNode : public Node<std::string::size_type>
 {
 public:
-    typedef SeqlevBarcodeMatch match_type;
+    typedef SeqlevBarcodeMatch<T> match_type;
 
-    SeqlevBarcodeNode(std::string, std::string::size_type);
+    SeqlevBarcodeNode(std::string fullseq, std::string::size_type mismatches);
+
+    virtual match_type* match(Read &rd) const;
+
 protected:
     SeqlevBarcodeNode();
     std::string m_sequence;
 };
 
-class FwSeqlevBarcodeNode : virtual public SeqlevBarcodeNode, virtual public FwBarcodeNode
+class FwSeqlevBarcodeNode : public SeqlevBarcodeNode<FwSeqlevBarcodeNode>, public FwBarcodeNode
 {
 public:
     FwSeqlevBarcodeNode(std::string, std::string::size_type);
-    virtual match_type* match(Read&) const;
 };
 
-class RevSeqlevBarcodeNode : virtual public SeqlevBarcodeNode, virtual public RevBarcodeNode
+class RevSeqlevBarcodeNode : public SeqlevBarcodeNode<RevSeqlevBarcodeNode>, public RevBarcodeNode
 {
 public:
     RevSeqlevBarcodeNode(std::string, std::string::size_type);
-    virtual match_type* match(Read&) const;
 };
 
-class DummySeqlevBarcodeNode : virtual public SeqlevBarcodeNode, virtual public FwBarcodeNode
+class DummySeqlevBarcodeNode : public SeqlevBarcodeNode<DummySeqlevBarcodeNode>, public FwBarcodeNode
 {
 public:
     DummySeqlevBarcodeNode();
-    virtual SeqlevBarcodeNode::match_type* match(Read&) const;
+    virtual SeqlevBarcodeNode<DummySeqlevBarcodeNode>::match_type* match(Read&) const;
 };
 
 class InsertNode : public Node<std::string::size_type>
@@ -161,5 +166,60 @@ public:
     virtual InsertNode::match_type* match(Read&) const;
 };
 
+template<class T>
+HammingBarcodeNode<T>::HammingBarcodeNode(std::string fullseq, float mismatches, std::vector<std::string> uniqueSeqs)
+: Node(std::move(fullseq), mismatches), m_uniqueSequences(std::move(uniqueSeqs))
+{}
+
+template<class T>
+typename HammingBarcodeNode<T>::match_type* HammingBarcodeNode<T>::match(Read &rd) const
+{
+    const T* cthis = static_cast<const T*>(this);
+    std::pair<typename decltype(m_uniqueSequences)::size_type, std::string::size_type> bestFind(0, SIZE_MAX);
+    if (!m_allowedMismatches){
+        for (const auto &seq : m_uniqueSequences) {
+            auto tomatch = cthis->getIterators(seq, rd, seq.size());
+            if (std::equal(std::get<0>(tomatch), std::get<1>(tomatch), std::get<2>(tomatch)))
+                return new HammingBarcodeMatch<T>(this, seq.size(), 0);
+        }
+    } else {
+        auto it = m_uniqueSequences.cbegin();
+        for (typename decltype(m_uniqueSequences)::size_type i = 0; i < m_uniqueSequences.size(); ++i, ++it) {
+            auto tomatch = cthis->getIterators(*it, rd, it->size());
+            auto found = hamming_distance(tomatch[0], tomatch[1], tomatch[2]);
+            if (found < bestFind.second) {
+                bestFind.first = i;
+                bestFind.second = found;
+            }
+            if (!found)
+                break;
+        }
+
+    }
+    return new HammingBarcodeMatch<T>(this, m_uniqueSequences[bestFind.first].size(), bestFind.second);
+}
+
+template<class T>
+HammingBarcodeNode<T>::HammingBarcodeNode()
+: Node(node_dummykey, 0)
+{}
+
+template<class T>
+SeqlevBarcodeNode<T>::SeqlevBarcodeNode(std::string fullseq, std::string::size_type mismatches)
+: Node(std::move(fullseq), mismatches), m_sequence(sequence)
+{}
+
+template<class T>
+SeqlevBarcodeNode<T>::SeqlevBarcodeNode()
+: Node(node_dummykey, 0)
+{}
+
+template<class T>
+typename SeqlevBarcodeNode<T>::match_type* SeqlevBarcodeNode<T>::match(Read &rd) const
+{
+    auto length = m_sequence.size() + allowedMismatches(); // account for insertions
+    auto tomatch = static_cast<const T*>(this)->getIterators(m_sequence, rd, length);
+    return new SeqlevBarcodeMatch<T>(this, seqlev_distance(std::get<0>(tomatch), std::get<1>(tomatch), std::get<2>(tomatch), std::get<3>(tomatch), m_sequence.size(), length));
+}
 
 #endif

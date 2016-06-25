@@ -68,7 +68,7 @@ namespace std
 std::string::size_type seqlev_distance(const std::string &needle, const std::string &haystack, bool at_end)
 {
     if (at_end)
-        return seqlev_distance_end(needle.cbegin(), needle.cend(), haystack.cbegin(), haystack.cend());
+        return seqlev_distance(needle.crbegin(), needle.crend(), haystack.crbegin(), haystack.crend(), needle.size(), haystack.size());
     else
-        return seqlev_distance(needle.cbegin(), needle.cend(), haystack.cbegin(), haystack.cend());
+        return seqlev_distance(needle.cbegin(), needle.cend(), haystack.cbegin(), haystack.cend(), needle.size(), haystack.size());
 }
