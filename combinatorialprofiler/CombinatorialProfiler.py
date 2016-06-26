@@ -233,6 +233,9 @@ def main():
     parser.add_argument('-r', '--resume', required=False, action='store_true', help='Resume aborted run? If intermediate files are found, they will be reused instead.')
     parser.add_argument('-l', '--log-level', required=False, default='INFO', choices=['ERROR', 'WARNING', 'INFO', 'DEBUG'])
     parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + version, help='Print version and exit')
+
+    parser.add_argument('--xkcd', action='store_true', required=False, help=argparse.SUPPRESS)
+
     args = parser.parse_args()
 
     starttime = time.monotonic()
@@ -388,6 +391,9 @@ def main():
                     dump_df(ndsi_bynuc, os.path.join(args.outdir, "%sNDSIs_bynuc" % prefixes[e]))
                     pickle.dump(nspec, open(nspecfile, 'w+b'), 3)
             if nspec:
+                if args.xkcd:
+                    plt.xkcd()
+
                 plot_correlations(ndsi_byaa, nspec, (1, counts[nspec.ndsicol].cat.categories.size), os.path.join(args.outdir, "%sNDSIs_byaa_cor.pdf" % prefixes[e]), e.name)
                 plot_correlations(ndsi_byaa[~ndsi_byaa['translation'].str.contains('*', regex=False)], nspec, (1, counts[nspec.ndsicol].cat.categories.size), os.path.join(args.outdir, "%sNDSIs_byaa_cor_nostop.pdf" % prefixes[e]), e.name)
 
