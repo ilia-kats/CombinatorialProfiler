@@ -210,9 +210,9 @@ def read_df_if_exists(prefix, read=True):
         if read:
             return pd.read_pickle(prefix + '.pkl')
         else:
-            return True
+            return os.path.getmtime(prefix + '.pkl')
     else:
-        return False
+        return None
 
 class InvalidArgumentException(BaseException):
     pass
@@ -334,7 +334,8 @@ def main():
             else:
                 prefixes[e] = "%s_" % e.name
             rawcountsprefixes[e] = os.path.join(args.outdir, "%sraw_counts" % prefixes[e])
-            if not read_df_if_exists(rawcountsprefixes[e], False):
+            ex = read_df_if_exists(rawcountsprefixes[e], False)
+            if ex is None or ex < os.path.getmtime(args.configuration):
                 have_counts = False
 
         if args.resume and have_counts:
