@@ -88,18 +88,18 @@ cdef class PyExperiment:
 
     def fromDict(self, d):
         if 'insert' in d:
-            self._exprmnt.insert = d['insert'].encode()
+            self._exprmnt.insert = d['insert'].upper().encode()
         else:
             raise RuntimeError("Insert sequence missing from experiment %s" % self._exprmnt.name)
         if 'barcodes_fw' in d:
             for k, v in d['barcodes_fw'].items():
-                self._exprmnt.fwBarcodeSet[v.encode()] = k.encode()
+                self._exprmnt.fwBarcodeSet[v.upper().encode()] = k.encode()
         if 'barcodes_rev' in d:
             for k,v in d['barcodes_rev'].items():
-                self._exprmnt.revBarcodeSet[v.encode()] = k.encode()
+                self._exprmnt.revBarcodeSet[v.upper().encode()] = k.encode()
         if 'named_inserts' in d:
             for k,v in d['named_inserts'].items():
-                self._exprmnt.namedInserts[v.encode()] = k.encode()
+                self._exprmnt.namedInserts[v.upper().encode()] = k.encode()
         if 'ndsi' in d:
             haveNdsi = False
             if d['ndsi'] == 'forward':
