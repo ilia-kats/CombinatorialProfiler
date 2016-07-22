@@ -154,7 +154,7 @@ def plot_histograms(df, nspec, filename, experiment, quantile=1):
 
             fig = plt.figure(figsize=(5,3))
             limits = (0, counts.max())
-            nbins = 100
+            nbins = min(100, int(counts.size / 10))
             hist = plt.hist(counts, nbins, range=limits, normed=True, color="#000000", alpha=0.66, edgecolor='none')
             plt.xlim(limits)
             plt.xlabel("Total read count")
