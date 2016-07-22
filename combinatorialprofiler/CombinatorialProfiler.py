@@ -145,6 +145,33 @@ def plot_profiles(df, groupby, nspec, filename, experiment):
     ctime2 = time.monotonic()
     logging.info("Finished plotting read count profiles after %d seconds" % round(ctime2 - ctime1))
 
+def plot_histograms(df, nspec, filename, experiment, quantile=1):
+    logging.info("Plotting read count histograms for experiment %s into %s" % (experiment, filename))
+    ctime1 = time.monotonic()
+    with PdfPages(filename) as pdf:
+        for code, group in df.groupby(nspec.groupby):
+            counts = group['counts_sum'][group['counts_sum'] <= group['counts_sum'].quantile(quantile)]
+
+            fig = plt.figure(figsize=(5,3))
+            limits = (0, counts.max())
+            nbins = 100
+            hist = plt.hist(counts, nbins, range=limits, normed=True, color="#000000", alpha=0.66, edgecolor='none')
+            plt.xlim(limits)
+            plt.xlabel("Total read count")
+            plt.ylabel("Frequency")
+
+            smoothedbins = np.linspace(limits[0], limits[1], nbins * 10)
+            kde = gaussian_kde(counts)
+            kde.set_bandwidth(kde.factor * 0.75)
+            y = kde.evaluate(smoothedbins)
+            plt.plot(smoothedbins, y, 'k-')
+
+            plt.title(code)
+            pdf.savefig(bbox_inches='tight')
+            plt.close()
+    ctime2 = time.monotonic()
+    logging.info("Finished plotting read count histograms after %d seconds" % round(ctime2 - ctime1))
+
 def plot_correlations(df, nspec, limits, filename, experiment):
     logging.info("Plotting NDSI correlations for experiment %s into %s" % (experiment, filename))
     ctime1 = time.monotonic()
@@ -397,6 +424,12 @@ def main():
 
                 plot_correlations(ndsi_byaa, nspec, (1, counts[nspec.ndsicol].cat.categories.size), os.path.join(args.outdir, "%sNDSIs_byaa_cor.pdf" % prefixes[e]), e.name)
                 plot_correlations(ndsi_byaa[~ndsi_byaa['translation'].str.contains('*', regex=False)], nspec, (1, counts[nspec.ndsicol].cat.categories.size), os.path.join(args.outdir, "%sNDSIs_byaa_cor_nostop.pdf" % prefixes[e]), e.name)
+
+                histogramdir = os.path.join(args.outdir, "readcount_histograms")
+                os.makedirs(histogramdir, exist_ok=True)
+                for q in np.linspace(0.9, 1, 11):
+                    plot_histograms(ndsi_bynuc, nspec, os.path.join(histogramdir, "%sNDSIs_bynuc_readcounts_%.2f_quantile.pdf" % (prefixes[e], q)), e.name, q)
+                    plot_histograms(ndsi_byaa, nspec, os.path.join(histogramdir, "%sNDSIs_byaa_readcounts_%.2f_quantile.pdf" % (prefixes[e], q)), e.name, q)
 
                 plot_profiles(counts, [nspec.groupby, nspec.seqcol], nspec, os.path.join(args.outdir, "%sbynuc_countplots.pdf" % prefixes[e]), e.name)
                 plot_profiles(counts.groupby([nspec.groupby, nspec.ndsicol, 'translation'])['normalized_counts'].sum().reset_index(), [nspec.groupby, 'translation'], nspec, os.path.join(args.outdir, "%sbyaa_countplots.pdf" % prefixes[e]), e.name)
