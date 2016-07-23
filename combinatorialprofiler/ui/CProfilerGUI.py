@@ -7,14 +7,15 @@ import json
 
 from pkg_resources import resource_stream
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QListWidgetItem, QTableWidgetItem, QDialogButtonBox, QFileDialog, QMessageBox, QStyle
-from PyQt5.QtCore import QRegExp, Qt, pyqtRemoveInputHook
-from PyQt5.QtGui import QDoubleValidator, QRegExpValidator
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QMessageBox, QStyle
+from PyQt5.QtCore import pyqtRemoveInputHook
+from PyQt5.QtGui import QIcon
 from PyQt5 import uic
 
 from .experimentswidget import ExperimentsWidget
 from .experimentwidget import ExperimentWidget
 from .aboutdialog import AboutDialog
+from .resources import resources
 
 class MainWidget(QWidget):
     ui = uic.loadUiType(resource_stream(__name__, "main.ui"))
@@ -108,6 +109,7 @@ class MainWindow(QMainWindow):
 def main():
     pyqtRemoveInputHook()
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon(":/icon.svg"))
     main = MainWindow()
     main.resize(1280, 1024)
     main.show()
