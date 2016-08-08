@@ -31,9 +31,9 @@ def formatTime(seconds):
     if seconds < 60:
         return "%i seconds" % round(seconds)
     elif seconds < 3600:
-        return "%.1f minutes" % seconds / 60
+        return "%.1f minutes" % (seconds / 60)
     else:
-        return "%.1f hours" % seconds / 3600
+        return "%.1f hours" % (seconds / 3600)
 
 def normalizeCounts(df, sortedcells):
     categories = (df['experiment'].cat.categories.sort_values(), df['barcode_fw'].cat.categories.sort_values(), df['barcode_rev'].cat.categories.sort_values())
