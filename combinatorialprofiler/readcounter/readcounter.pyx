@@ -27,8 +27,8 @@ cdef extern from "Experiment.h" nogil:
     ctypedef unordered_map[string, unordered_map[string, double]] SortedCellCounts
     ctypedef unordered_map[pair[string, string], unordered_map[string, uint64_t]] Counts
 
-    cpdef enum NDSIS:
-        noNDSI = 0
+    cpdef enum DSIS:
+        noDSI = 0
         forward = 1
         reverse = 2
 
@@ -41,7 +41,7 @@ cdef extern from "Experiment.h" nogil:
         SequenceSet fwBarcodeSet
         SequenceSet revBarcodeSet
         SequenceSet namedInserts
-        NDSIS ndsi
+        DSIS dsi
         SortedCellCounts sortedCells
         Counts counts
 
@@ -100,17 +100,17 @@ cdef class PyExperiment:
         if 'named_inserts' in d:
             for k,v in d['named_inserts'].items():
                 self._exprmnt.namedInserts[v.upper().encode()] = k.encode()
-        if 'ndsi' in d:
-            haveNdsi = False
-            if d['ndsi'] == 'forward':
-                self._exprmnt.ndsi = forward
-                haveNdsi = True
-            elif d['ndsi'] == 'reverse':
-                self._exprmnt.ndsi = reverse
-                haveNdsi = True
+        if 'dsi' in d:
+            haveDsi = False
+            if d['dsi'] == 'forward':
+                self._exprmnt.dsi = forward
+                haveDsi = True
+            elif d['dsi'] == 'reverse':
+                self._exprmnt.dsi = reverse
+                haveDsi = True
             else:
-                self._exprmnt.ndsi = noNDSI
-            if haveNdsi and 'sortedcells' in d:
+                self._exprmnt.dsi = noDSI
+            if haveDsi and 'sortedcells' in d:
                 for fw, revs in d['sortedcells'].items():
                     for r, v in revs.items():
                         self._exprmnt.sortedCells[fw.encode()][r.encode()] = v
@@ -120,10 +120,10 @@ cdef class PyExperiment:
         d['barcodes_fw'] = self._exprmnt.fwBarcodeSet
         d['barcodes_rev'] = self._exprmnt.revBarcodeSet
         d['named_inserts'] = self._exprmnt.namedInserts
-        if self._exprmnt.ndsi == forward:
-            d['ndsi'] = 'forward'
-        elif self._exprmnt.ndsi == reverse:
-            d['ndsi'] = 'reverse'
+        if self._exprmnt.dsi == forward:
+            d['dsi'] = 'forward'
+        elif self._exprmnt.dsi == reverse:
+            d['dsi'] = 'reverse'
         d['sortedcells'] = self._exprmnt.sortedCells
         return d
 
@@ -193,8 +193,8 @@ cdef class PyExperiment:
         return self._exprmnt.namedInserts
 
     @property
-    def ndsi(self):
-        return NDSIS(self._exprmnt.ndsi)
+    def dsi(self):
+        return DSIS(self._exprmnt.dsi)
 
     @property
     def sorted_cells(self):

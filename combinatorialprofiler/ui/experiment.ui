@@ -62,9 +62,9 @@
       <widget class="TwoColumnWidget" name="barcodes_rev" native="true"/>
       <widget class="TwoColumnWidget" name="named_inserts" native="true"/>
      </widget>
-     <widget class="QGroupBox" name="ndsiGrp">
+     <widget class="QGroupBox" name="dsiGrp">
       <property name="title">
-       <string>Ca&amp;lculate NDSIs on:</string>
+       <string>Ca&amp;lculate DSIs on:</string>
       </property>
       <property name="flat">
        <bool>true</bool>
@@ -98,7 +98,7 @@
           </spacer>
          </item>
          <item>
-          <widget class="QRadioButton" name="ndsiOnFw">
+          <widget class="QRadioButton" name="dsiOnFw">
            <property name="text">
             <string>f&amp;orward barcodes</string>
            </property>
@@ -108,7 +108,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QRadioButton" name="ndsiOnRev">
+          <widget class="QRadioButton" name="dsiOnRev">
            <property name="text">
             <string>rever&amp;se barcodes</string>
            </property>

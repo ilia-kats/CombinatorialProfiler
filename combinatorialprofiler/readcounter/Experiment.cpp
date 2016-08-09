@@ -1,9 +1,9 @@
 #include "Experiment.h"
 
 Experiment::Experiment()
-: ndsi(NDSIS::noNDSI)
+: dsi(DSIS::noDSI)
 {}
 
 Experiment::Experiment(std::string n)
-: name(std::move(n)), ndsi(NDSIS::noNDSI)
+: name(std::move(n)), dsi(DSIS::noDSI)
 {}

@@ -7,8 +7,8 @@ import pandas as pd
 import Bio.Seq
 import Bio.Alphabet
 
-from combinatorialprofiler.CombinatorialProfiler import normalizeCounts, getNDSI, getNDSISpec
-from combinatorialprofiler.readcounter import NDSIS
+from combinatorialprofiler.CombinatorialProfiler import normalizeCounts, getDSI, getDSISpec
+from combinatorialprofiler.readcounter import DSIS
 
 class DFCreator:
     nucleotides = ['A', 'T', 'C', 'G']
@@ -22,9 +22,9 @@ class DFCreator:
         self.seqs = set(["".join([random.choice(self.nucleotides) for n in range(self.seqlen)]) for s in range(random.randint(1000, 10000))])
         self.aaseqs = set([str(Bio.Seq.Seq(s, Bio.Alphabet.generic_dna).translate()) for s in self.seqs])
 
-        self.ndsi_aa_median = {}
-        self.ndsi_aa_pooled = {}
-        self.ndsi_nuc = {}
+        self.dsi_aa_median = {}
+        self.dsi_aa_pooled = {}
+        self.dsi_nuc = {}
 
         normalizedreads_nuc = {}
         normalizedreads_aa = {}
@@ -70,9 +70,9 @@ class DFCreator:
                         numerator += (r + 1) * normalizedreads_nuc[(fw, rev)][s]
                         denominator += normalizedreads_nuc[(fw, rev)][s]
                 if numerator > 0 and denominator > 0:
-                    self.ndsi_nuc.setdefault(fw, {})[s] = numerator / denominator
+                    self.dsi_nuc.setdefault(fw, {})[s] = numerator / denominator
                     aa = str(Bio.Seq.Seq(s, Bio.Alphabet.generic_dna).translate())
-                    self.ndsi_aa_median.setdefault(fw, {}).setdefault(aa, []).append(numerator / denominator)
+                    self.dsi_aa_median.setdefault(fw, {}).setdefault(aa, []).append(numerator / denominator)
             for s in self.aaseqs:
                 numerator = 0
                 denominator = 0
@@ -81,8 +81,8 @@ class DFCreator:
                         numerator += (r + 1) * normalizedreads_aa[(fw, rev)][s]
                         denominator += normalizedreads_aa[(fw, rev)][s]
                 if numerator > 0 and denominator > 0:
-                    self.ndsi_aa_pooled.setdefault(fw, {})[s] = numerator / denominator
-        for fw, nn in self.ndsi_aa_median.items():
+                    self.dsi_aa_pooled.setdefault(fw, {})[s] = numerator / denominator
+        for fw, nn in self.dsi_aa_median.items():
             for aa, l in nn.items():
                 nn[aa] = np.median(l)
 
@@ -113,14 +113,14 @@ class DFCreator:
                 counts.append(c)
         self.sortedcells_df = pd.Series(counts, index=pd.MultiIndex.from_arrays((barcode_fw, barcode_rev), names=('barcode_fw', 'barcode_rev')))
 
-def test_ndsicalc():
+def test_dsicalc():
     random.seed(42)
     simu = DFCreator()
     ncounts = normalizeCounts(simu.df, simu.sortedcells_df)
     ncounts['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in ncounts.itertuples()])
-    ndsi_byaa, ndsi_bynuc = getNDSI(ncounts, getNDSISpec(NDSIS.reverse))
-    for ndsi in ndsi_byaa.itertuples():
-        assert round(ndsi.median_ndsi, 5) == round(simu.ndsi_aa_median[ndsi.barcode_fw][ndsi.translation], 5)
-        assert round(ndsi.pooled_ndsi, 5) == round(simu.ndsi_aa_pooled[ndsi.barcode_fw][ndsi.translation], 5)
-    for ndsi in ndsi_bynuc.itertuples():
-        assert round(ndsi.ndsi, 5) == round(simu.ndsi_nuc[ndsi.barcode_fw][ndsi.sequence], 5)
+    dsi_byaa, dsi_bynuc = getDSI(ncounts, getDSISpec(DSIS.reverse))
+    for dsi in dsi_byaa.itertuples():
+        assert round(dsi.median_dsi, 5) == round(simu.dsi_aa_median[dsi.barcode_fw][dsi.translation], 5)
+        assert round(dsi.pooled_dsi, 5) == round(simu.dsi_aa_pooled[dsi.barcode_fw][dsi.translation], 5)
+    for dsi in dsi_bynuc.itertuples():
+        assert round(dsi.dsi, 5) == round(simu.dsi_nuc[dsi.barcode_fw][dsi.sequence], 5)

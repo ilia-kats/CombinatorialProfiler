@@ -54,9 +54,9 @@ class ExperimentWidget(QWidget):
         self.ui.barcodes_rev.valid.connect(self._validChanged)
         self.ui.named_inserts.valid.connect(self._validChanged)
         self.ui.insertSequence.textChanged.connect(self._validChanged)
-        self.ui.ndsiGrp.toggled.connect(self._validChanged)
-        self.ui.ndsiOnFw.toggled.connect(self._validChanged)
-        self.ui.ndsiOnRev.toggled.connect(self._validChanged)
+        self.ui.dsiGrp.toggled.connect(self._validChanged)
+        self.ui.dsiOnFw.toggled.connect(self._validChanged)
+        self.ui.dsiOnRev.toggled.connect(self._validChanged)
 
     def fwCodeAdded(self, row, text):
         nrow = self.ui.sortedCellsTbl.rowCount()
@@ -148,11 +148,11 @@ class ExperimentWidget(QWidget):
         d = {'insert': self.ui.insertSequence.text(), 'barcodes_fw': self.ui.barcodes_fw.serialize(), 'barcodes_rev': self.ui.barcodes_rev.serialize()}
         if self.ui.named_inserts.count():
             d['named_inserts'] = self.ui.named_inserts.serialize()
-        if self.ui.ndsiGrp.isChecked():
-            if self.ui.ndsiOnFw.isChecked():
-                d['ndsi'] = "forward"
+        if self.ui.dsiGrp.isChecked():
+            if self.ui.dsiOnFw.isChecked():
+                d['dsi'] = "forward"
             else:
-                d['ndsi'] = "reverse"
+                d['dsi'] = "reverse"
             cells = {}
             for r in range(self.ui.sortedCellsTbl.rowCount()):
                 fwcode = self.ui.sortedCellsTbl.verticalHeaderItem(r).text()
@@ -192,12 +192,12 @@ class ExperimentWidget(QWidget):
                 self.ui.sortedCellsTbl.setItem(fwrows[fw], revcols[rev], item)
         self.ui.sortedCellsTbl.resizeColumnsToContents()
 
-        if 'ndsi' in d:
-            self.ui.ndsiGrp.setChecked(True)
-            if d['ndsi'] == 'forward':
-                self.ui.ndsiOnFw.setChecked(True)
-            elif d['ndsi'] == 'reverse':
-                self.ui.ndsiOnRev.setChecked(True)
+        if 'dsi' in d:
+            self.ui.dsiGrp.setChecked(True)
+            if d['dsi'] == 'forward':
+                self.ui.dsiOnFw.setChecked(True)
+            elif d['dsi'] == 'reverse':
+                self.ui.dsiOnRev.setChecked(True)
 
     def isValid(self):
         if not self.ui.barcodes_fw.isValid():
@@ -208,8 +208,8 @@ class ExperimentWidget(QWidget):
             return False
         if not self.ui.insertSequence.hasAcceptableInput():
             return False
-        if self.ui.ndsiGrp.isChecked():
-            if self.ui.ndsiOnFw.isChecked():
+        if self.ui.dsiGrp.isChecked():
+            if self.ui.dsiOnFw.isChecked():
                 oloop = self.ui.sortedCellsTbl.columnCount
                 iloop = self.ui.sortedCellsTbl.rowCount
                 coords = lambda o,i: (i, o)

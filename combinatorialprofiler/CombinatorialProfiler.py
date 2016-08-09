@@ -24,7 +24,7 @@ from scipy.stats import gaussian_kde
 import Bio.Seq
 import Bio.Alphabet
 
-from .readcounter import PyHammingReadCounter, PySeqlevReadCounter, PyExperiment, NDSIS
+from .readcounter import PyHammingReadCounter, PySeqlevReadCounter, PyExperiment, DSIS
 from . import version
 
 def formatTime(seconds):
@@ -45,63 +45,63 @@ def normalizeCounts(df, sortedcells):
     df['barcode_rev'] = df['barcode_rev'].astype("category", categories=categories[2])
     return df
 
-class NDSISpec(object):
+class DSISpec(object):
     pass
 
-def getNDSISpec(e):
-    nspec = NDSISpec()
+def getDSISpec(e):
+    dspec = DSISpec()
     if isinstance(e, PyExperiment):
-        ndsi = e.ndsi
+        dsi = e.dsi
         if len(e.named_inserts):
-            nspec.seqcol = 'named_insert'
+            dspec.seqcol = 'named_insert'
         else:
-            nspec.seqcol = 'sequence'
-    elif isinstance(e, NDSIS):
-        ndsi = e
+            dspec.seqcol = 'sequence'
+    elif isinstance(e, DSIS):
+        dsi = e
     else:
         raise TypeError("Unsupported type")
 
-    if ndsi == NDSIS.noNDSI:
+    if dsi == DSIS.noDSI:
         return None
-    elif ndsi == NDSIS.forward:
-        nspec.groupby = 'barcode_rev'
-        nspec.ndsicol = 'barcode_fw'
-    elif ndsi == NDSIS.reverse:
-        nspec.groupby = 'barcode_fw'
-        nspec.ndsicol = 'barcode_rev'
+    elif dsi == DSIS.forward:
+        dspec.groupby = 'barcode_rev'
+        dspec.dsicol = 'barcode_fw'
+    elif dsi == DSIS.reverse:
+        dspec.groupby = 'barcode_fw'
+        dspec.dsicol = 'barcode_rev'
 
-    return nspec
+    return dspec
 
-def getNDSI(df, nspec):
+def getDSI(df, dspec):
     statsfuns = ['min', 'max', 'mean', 'median', 'std', 'sum']
 
-    fractionvals = pd.Series(range(1, df[nspec.ndsicol].cat.categories.size + 1), index=sorted(df[nspec.ndsicol].cat.categories))
+    fractionvals = pd.Series(range(1, df[dspec.dsicol].cat.categories.size + 1), index=sorted(df[dspec.dsicol].cat.categories))
 
-    df['normalized_counts_cells'] = df.set_index(nspec.ndsicol, append=True)['normalized_counts'].mul(fractionvals, level=nspec.ndsicol).reset_index(level=nspec.ndsicol, drop=True)
+    df['normalized_counts_cells'] = df.set_index(dspec.dsicol, append=True)['normalized_counts'].mul(fractionvals, level=dspec.dsicol).reset_index(level=dspec.dsicol, drop=True)
 
-    groupbyl = ['experiment', nspec.groupby]
+    groupbyl = ['experiment', dspec.groupby]
     if 'named_insert' in df.columns:
         groupbyl.append('named_insert')
 
     g = df.groupby(groupbyl + ['translation','sequence'])
     byseq = (g['normalized_counts_cells'].sum() / g['normalized_counts'].sum()).dropna()
-    byseq.name = 'ndsi'
+    byseq.name = 'dsi'
     byseq_stats = g.agg({'counts': statsfuns, 'normalized_counts': statsfuns})
     byseq_stats.columns = ['_'.join(col) for col in byseq_stats.columns.values]
     byseq_stats['nfractions'] = g.agg('size')
 
     byaa_median = byseq.groupby(level=groupbyl + ['translation']).median().dropna()
-    byaa_median.name = 'median_ndsi'
+    byaa_median.name = 'median_dsi'
 
     g = df.groupby(groupbyl + ['translation'])
     byaa_pooled = (g['normalized_counts_cells'].sum() / g['normalized_counts'].sum()).dropna()
-    byaa_pooled.name = 'pooled_ndsi'
+    byaa_pooled.name = 'pooled_dsi'
 
     byaa_stats = g.agg({'counts': statsfuns, 'normalized_counts': statsfuns})
     byaa_stats.columns = ['_'.join(col) for col in byaa_stats.columns.values]
-    byaa_stats['nfractions'] = g[nspec.ndsicol].nunique()
+    byaa_stats['nfractions'] = g[dspec.dsicol].nunique()
 
-    return (pd.concat((byaa_median, byaa_pooled, byaa_stats), axis=1).reset_index().dropna(subset=('median_ndsi', 'pooled_ndsi')), pd.concat((byseq, byseq_stats), axis=1).reset_index().dropna(subset=['ndsi']))
+    return (pd.concat((byaa_median, byaa_pooled, byaa_stats), axis=1).reset_index().dropna(subset=('median_dsi', 'pooled_dsi')), pd.concat((byseq, byseq_stats), axis=1).reset_index().dropna(subset=['dsi']))
 
 class PyExperimentJSONEncoder(json.JSONEncoder):
     def default(self, o):
@@ -131,16 +131,16 @@ def exec_with_logging(args, pname, out=None, err=None):
         logging.error("%s with returncode %d" % (infostr, ret))
     return ret
 
-def plot_profiles(df, groupby, nspec, filename, experiment):
+def plot_profiles(df, groupby, dspec, filename, experiment):
     logging.info("Plotting read count profiles for experiment %s into %s" % (experiment, filename))
     ctime1 = time.monotonic()
-    labels = sorted(df[nspec.ndsicol].cat.categories)
+    labels = sorted(df[dspec.dsicol].cat.categories)
     integer_map = dict([(val, i) for i, val in enumerate(labels)])
     with PdfPages(filename) as pdf:
         for (code, seq), group in df.groupby(groupby):
             fig = plt.figure(figsize=(5,3))
 
-            xvals = group[nspec.ndsicol].map(integer_map)
+            xvals = group[dspec.dsicol].map(integer_map)
             xorder = xvals.argsort()
             plot = plt.plot(xvals.iloc[xorder], group['normalized_counts'].iloc[xorder], 'k.-')
             plt.xlim(0, len(labels) - 1)
@@ -153,11 +153,11 @@ def plot_profiles(df, groupby, nspec, filename, experiment):
     ctime2 = time.monotonic()
     logging.info("Finished plotting read count profiles after %s" % formatTime(ctime2 - ctime1))
 
-def plot_histograms(df, nspec, filename, experiment, quantile=1):
+def plot_histograms(df, dspec, filename, experiment, quantile=1):
     logging.info("Plotting read count histograms for experiment %s into %s" % (experiment, filename))
     ctime1 = time.monotonic()
     with PdfPages(filename) as pdf:
-        for code, group in df.groupby(nspec.groupby):
+        for code, group in df.groupby(dspec.groupby):
             counts = group['counts_sum'][group['counts_sum'] <= group['counts_sum'].quantile(quantile)]
 
             fig = plt.figure(figsize=(5,3))
@@ -180,20 +180,20 @@ def plot_histograms(df, nspec, filename, experiment, quantile=1):
     ctime2 = time.monotonic()
     logging.info("Finished plotting read count histograms after %s" % formatTime(ctime2 - ctime1))
 
-def plot_correlations(df, nspec, limits, filename, experiment):
-    logging.info("Plotting NDSI correlations for experiment %s into %s" % (experiment, filename))
+def plot_correlations(df, dspec, limits, filename, experiment):
+    logging.info("Plotting DSI correlations for experiment %s into %s" % (experiment, filename))
     ctime1 = time.monotonic()
     with PdfPages(filename) as pdf:
-        for code, group in df.groupby(nspec.groupby):
-            c = group['median_ndsi'].corr(group['pooled_ndsi'], method='spearman')
+        for code, group in df.groupby(dspec.groupby):
+            c = group['median_dsi'].corr(group['pooled_dsi'], method='spearman')
 
             fig = plt.figure(figsize=(7,7))
 
             ax = fig.add_subplot(1,1,1)
-            ax.scatter(group['median_ndsi'], group['pooled_ndsi'], s=100, c="#000000", alpha=1/3, marker='.', edgecolor='none')
+            ax.scatter(group['median_dsi'], group['pooled_dsi'], s=100, c="#000000", alpha=1/3, marker='.', edgecolor='none')
 
-            ax.set_xlabel("median NDSI")
-            ax.set_ylabel("pooled NDSI")
+            ax.set_xlabel("median DSI")
+            ax.set_ylabel("pooled DSI")
             ax.text(0.1, 0.9, "Spearman's $r = %.3g$" % c, transform=ax.transAxes)
             ax.set_aspect('equal', adjustable='box', anchor='C')
 
@@ -205,22 +205,22 @@ def plot_correlations(df, nspec, limits, filename, experiment):
             histY = divider.append_axes("right", 1.2, pad=0.2, sharey=ax)
 
 
-            n, bins, patches = histX.hist(group['median_ndsi'], bins=nbins, range=limits, normed=True, color="#000000", alpha=0.66, edgecolor='none')
+            n, bins, patches = histX.hist(group['median_dsi'], bins=nbins, range=limits, normed=True, color="#000000", alpha=0.66, edgecolor='none')
             plt.setp(histX.get_xticklabels(), visible=False)
             histX.set_ylabel("Frequency")
 
             smoothedbins = np.arange(limits[0], limits[1], 0.01)
-            kde = gaussian_kde(group['median_ndsi'])
+            kde = gaussian_kde(group['median_dsi'])
             kde.set_bandwidth(kde.factor * 0.75)
             y = kde.evaluate(smoothedbins)
             #y = y / y.max() * n.max()
             histX.plot(smoothedbins, y, 'k-')
             histX.locator_params('y', nbins=3)
 
-            n, bins, patches = histY.hist(group['pooled_ndsi'], bins=nbins, range=limits, normed=True, color="#000000", alpha=0.66, orientation='horizontal', edgecolor='none')
+            n, bins, patches = histY.hist(group['pooled_dsi'], bins=nbins, range=limits, normed=True, color="#000000", alpha=0.66, orientation='horizontal', edgecolor='none')
             plt.setp(histY.get_yticklabels(), visible=False)
             histY.set_xlabel("Frequency")
-            kde = gaussian_kde(group['pooled_ndsi'])
+            kde = gaussian_kde(group['pooled_dsi'])
             kde.set_bandwidth(kde.factor * 0.75)
             y = kde.evaluate(smoothedbins)
             #y = y / y.max() * n.max()
@@ -234,7 +234,7 @@ def plot_correlations(df, nspec, limits, filename, experiment):
             pdf.savefig(bbox_inches='tight')
             plt.close()
     ctime2 = time.monotonic()
-    logging.info("Finished plotting NDSI correlations after %s" % formatTime(ctime2 - ctime1))
+    logging.info("Finished plotting DSI correlations after %s" % formatTime(ctime2 - ctime1))
 
 def dump_df(df, prefix):
     df.to_csv(prefix + '.csv', index=False, encoding='utf-8', float_format="%.10f")
@@ -257,7 +257,7 @@ def main():
     import difflib
 
     parser = argparse.ArgumentParser(description='Process paired-end Illumina reads for combinatorial degron profiling')
-    parser.add_argument('fastq', nargs='*', help='FASTQ files containing the reads to process. If more than two FASTQ files are given, every two consecutive files are assumed to contained paired-end reads and will be processed together. Read counts from all files will be aggregated for NDSI calculation.')
+    parser.add_argument('fastq', nargs='*', help='FASTQ files containing the reads to process. If more than two FASTQ files are given, every two consecutive files are assumed to contained paired-end reads and will be processed together. Read counts from all files will be aggregated for DSI calculation.')
     parser.add_argument('-o', '--outdir', required=False, default=os.getcwd(), help='Output directory')
     parser.add_argument('--fastqc', required=False, default='fastqc', help='Path to the fastq executable. If not given, fastqc will be assumed to be in PATH')
     parser.add_argument('--bowtie', required=False, default='bowtie2', help='Path to the bowtie2 executable. If not given, bowtie2 will be assumed to be in PATH')
@@ -398,49 +398,49 @@ def main():
             counts['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in counts.itertuples()])
             dump_df(counts, rawcountsprefixes[e])
 
-        if e.ndsi != NDSIS.noNDSI:
-            nspecfile = os.path.join(intermediate_outdir, "nspec.pkl")
-            byaafile = os.path.join(args.outdir, "%sNDSIs_byaa" % prefixes[e])
-            bynucfile = os.path.join(args.outdir, "%sNDSIs_bynuc" % prefixes[e])
+        if e.dsi != DSIS.noDSI:
+            dspecfile = os.path.join(intermediate_outdir, "dspec.pkl")
+            byaafile = os.path.join(args.outdir, "%sDSIs_byaa" % prefixes[e])
+            bynucfile = os.path.join(args.outdir, "%sDSIs_bynuc" % prefixes[e])
 
-            nspec = False
-            ndsi_byaa = False
-            ndsi_bynuc = False
-            if args.resume and os.path.isfile(nspecfile):
-                nspec = pickle.load(open(nspecfile, 'r+b'))
+            dspec = False
+            dsi_byaa = False
+            dsi_bynuc = False
+            if args.resume and os.path.isfile(dspecfile):
+                dspec = pickle.load(open(dspecfile, 'r+b'))
             if args.resume:
-                ndsi_byaa = read_df_if_exists(byaafile)
-                ndsi_bynuc = read_df_if_exists(bynucfile)
-            if nspec is not False and ndsi_byaa is not False and ndsi_bynuc is not False:
-                logging.info("Found NDSI data for experiment %s and resume is requested, continuing" % e.name)
+                dsi_byaa = read_df_if_exists(byaafile)
+                dsi_bynuc = read_df_if_exists(bynucfile)
+            if dspec is not False and dsi_byaa is not False and dsi_bynuc is not False:
+                logging.info("Found DSI data for experiment %s and resume is requested, continuing" % e.name)
             else:
                 args.resume = False
-                nspec = getNDSISpec(e)
-                if nspec:
-                    logging.info("Calculating NDSIs for experiment %s" % e.name)
+                dspec = getDSISpec(e)
+                if dspec:
+                    logging.info("Calculating DSIs for experiment %s" % e.name)
                     ctime1 = time.monotonic()
-                    ndsi_byaa, ndsi_bynuc = getNDSI(counts, nspec)
+                    dsi_byaa, dsi_bynuc = getDSI(counts, dspec)
                     ctime2 = time.monotonic()
-                    logging.info("Finished calculating NDSIs after %s" % formatTime(ctime2 - ctime1))
+                    logging.info("Finished calculating DSIs after %s" % formatTime(ctime2 - ctime1))
 
-                    dump_df(ndsi_byaa, os.path.join(args.outdir, "%sNDSIs_byaa" % prefixes[e]))
-                    dump_df(ndsi_bynuc, os.path.join(args.outdir, "%sNDSIs_bynuc" % prefixes[e]))
-                    pickle.dump(nspec, open(nspecfile, 'w+b'), 3)
-            if nspec:
+                    dump_df(dsi_byaa, os.path.join(args.outdir, "%sDSIs_byaa" % prefixes[e]))
+                    dump_df(dsi_bynuc, os.path.join(args.outdir, "%sDSIs_bynuc" % prefixes[e]))
+                    pickle.dump(dspec, open(dspecfile, 'w+b'), 3)
+            if dspec:
                 if args.xkcd:
                     plt.xkcd()
 
-                plot_correlations(ndsi_byaa, nspec, (1, counts[nspec.ndsicol].cat.categories.size), os.path.join(args.outdir, "%sNDSIs_byaa_cor.pdf" % prefixes[e]), e.name)
-                plot_correlations(ndsi_byaa[~ndsi_byaa['translation'].str.contains('*', regex=False)], nspec, (1, counts[nspec.ndsicol].cat.categories.size), os.path.join(args.outdir, "%sNDSIs_byaa_cor_nostop.pdf" % prefixes[e]), e.name)
+                plot_correlations(dsi_byaa, dspec, (1, counts[dspec.dsicol].cat.categories.size), os.path.join(args.outdir, "%sDSIs_byaa_cor.pdf" % prefixes[e]), e.name)
+                plot_correlations(dsi_byaa[~dsi_byaa['translation'].str.contains('*', regex=False)], dspec, (1, counts[dspec.dsicol].cat.categories.size), os.path.join(args.outdir, "%sDSIs_byaa_cor_nostop.pdf" % prefixes[e]), e.name)
 
                 histogramdir = os.path.join(args.outdir, "readcount_histograms")
                 os.makedirs(histogramdir, exist_ok=True)
                 for q in np.linspace(0.9, 1, 11):
-                    plot_histograms(ndsi_bynuc, nspec, os.path.join(histogramdir, "%sNDSIs_bynuc_readcounts_%.2f_quantile.pdf" % (prefixes[e], q)), e.name, q)
-                    plot_histograms(ndsi_byaa, nspec, os.path.join(histogramdir, "%sNDSIs_byaa_readcounts_%.2f_quantile.pdf" % (prefixes[e], q)), e.name, q)
+                    plot_histograms(dsi_bynuc, dspec, os.path.join(histogramdir, "%sDSIs_bynuc_readcounts_%.2f_quantile.pdf" % (prefixes[e], q)), e.name, q)
+                    plot_histograms(dsi_byaa, dspec, os.path.join(histogramdir, "%sDSIs_byaa_readcounts_%.2f_quantile.pdf" % (prefixes[e], q)), e.name, q)
 
-                plot_profiles(counts, [nspec.groupby, nspec.seqcol], nspec, os.path.join(args.outdir, "%sbynuc_countplots.pdf" % prefixes[e]), e.name)
-                plot_profiles(counts.groupby([nspec.groupby, nspec.ndsicol, 'translation'])['normalized_counts'].sum().reset_index(), [nspec.groupby, 'translation'], nspec, os.path.join(args.outdir, "%sbyaa_countplots.pdf" % prefixes[e]), e.name)
+                plot_profiles(counts, [dspec.groupby, dspec.seqcol], dspec, os.path.join(args.outdir, "%sbynuc_countplots.pdf" % prefixes[e]), e.name)
+                plot_profiles(counts.groupby([dspec.groupby, dspec.dsicol, 'translation'])['normalized_counts'].sum().reset_index(), [dspec.groupby, 'translation'], dspec, os.path.join(args.outdir, "%sbyaa_countplots.pdf" % prefixes[e]), e.name)
 
     stoptime = time.monotonic()
     logging.info("%s finished after %s" % (parser.prog, formatTime(stoptime - starttime)))

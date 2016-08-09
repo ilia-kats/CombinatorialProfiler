@@ -11,7 +11,7 @@ typedef std::unordered_map<std::string, std::string> SequenceSet;
 typedef std::unordered_map<std::string, std::unordered_map<std::string, double>> SortedCellCounts;
 typedef std::unordered_map<std::pair<std::string, std::string>, std::unordered_map<std::string, uint64_t>> Counts;
 
-enum NDSIS {noNDSI = 0, forward = 1, reverse = 2};
+enum DSIS {noDSI = 0, forward = 1, reverse = 2};
 class Experiment
 {
 public:
@@ -24,7 +24,7 @@ public:
     SequenceSet fwBarcodeSet;
     SequenceSet revBarcodeSet;
     SequenceSet namedInserts;
-    NDSIS ndsi;
+    DSIS dsi;
     SortedCellCounts sortedCells;
 
     Counts counts;
