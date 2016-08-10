@@ -22,7 +22,7 @@ class TwoColumnWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.invalid = [0, 0]
-        self.byrow = ({}, {})
+        self.byrow = ([], [])
         self.unique = ({}, {})
         self.ui = self.__class__.ui[0]()
         self.ui.setupUi(self)
@@ -67,8 +67,8 @@ class TwoColumnWidget(QWidget):
             seqitem.setText(sequence)
         n = nameitem.text()
         s = seqitem.text()
-        self.byrow[0][nrow] = n
-        self.byrow[1][nrow] = s
+        self.byrow[0].append(n)
+        self.byrow[1].append(s)
         self.unique[0][n] = self.unique[0].get(n, 0) + 1
         self.unique[1][s] = self.unique[1].get(s, 0) + 1
 
