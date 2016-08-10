@@ -5,10 +5,11 @@ from pkg_resources import resource_stream
 
 from PyQt5.QtWidgets import QApplication, QWidget, QTableWidgetItem, QStyle, QMessageBox, QFileDialog
 from PyQt5.QtCore import QRegExp, Qt, pyqtSignal
-from PyQt5.QtGui import QRegExpValidator, QIcon
+from PyQt5.QtGui import QRegExpValidator, QIcon, QCursor
 from PyQt5 import uic
 
 from .simpledelegate import SimpleDelegate
+from .util import WaitCursor
 from ..csvio import readBarcodes
 
 class TwoColumnWidget(QWidget):
@@ -76,7 +77,6 @@ class TwoColumnWidget(QWidget):
             self.invalid[0] += 1
         if self.unique[1][s] > 1 or not sequence:
             self.invalid[1] += 1
-
         self.ui.seqTbl.insertRow(nrow)
         self.rowAdded.emit(nrow + 1, nameitem.text())
         self.ui.seqTbl.setItem(nrow, 0, nameitem)
@@ -88,9 +88,10 @@ class TwoColumnWidget(QWidget):
 
     def _fromFile(self, f):
         try:
-            for n, c in readBarcodes(f):
-                self.addSequence(n, c)
-            self.ui.seqTbl.resizeColumnsToContents()
+            with WaitCursor():
+                for n, c in readBarcodes(f):
+                    self.addSequence(n, c)
+                self.ui.seqTbl.resizeColumnsToContents()
         except BaseException as e:
             QMessageBox.critical(self, "Error", str(e))
 
@@ -109,22 +110,23 @@ class TwoColumnWidget(QWidget):
 
     def removeSequences(self):
         selected = self.ui.seqTbl.selectionModel().selectedRows()
-        while len(selected):
-            row = selected[-1].row()
-            for col in range(2):
-                t = self.byrow[col][row]
-                self.unique[col][t] -= 1
-                count = self.unique[col][t]
-                del self.byrow[col][row]
-                if count > 0 or not t:
-                    self.invalid[col] -= 1
-                if not count:
-                    del self.unique[col][t]
+        with WaitCursor(len(selected) > 10):
+            while len(selected):
+                row = selected[-1].row()
+                for col in range(2):
+                    t = self.byrow[col][row]
+                    self.unique[col][t] -= 1
+                    count = self.unique[col][t]
+                    del self.byrow[col][row]
+                    if count > 0 or not t:
+                        self.invalid[col] -= 1
+                    if not count:
+                        del self.unique[col][t]
 
-            self.ui.seqTbl.removeRow(row)
-            self.rowRemoved.emit(row)
-            selected = self.ui.seqTbl.selectionModel().selectedRows()
-        self.valid.emit(self.isValid())
+                self.ui.seqTbl.removeRow(row)
+                self.rowRemoved.emit(row)
+                selected = self.ui.seqTbl.selectionModel().selectedRows()
+            self.valid.emit(self.isValid())
 
     def cellChanged(self, row, col):
         ot = self.byrow[col][row]

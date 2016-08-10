@@ -16,6 +16,7 @@ from .experimentswidget import ExperimentsWidget
 from .experimentwidget import ExperimentWidget
 from .aboutdialog import AboutDialog
 from .resources import resources
+from .util import WaitCursor
 
 class MainWidget(QWidget):
     ui = uic.loadUiType(resource_stream(__name__, "main.ui"))
@@ -69,12 +70,13 @@ class MainWidget(QWidget):
         dlg.setAcceptMode(QFileDialog.AcceptSave)
         dlg.setNameFilters(("JSON files (*.json)", "All files (*)"))
         if dlg.exec():
-            path = dlg.selectedFiles()[0]
-            with open(path, 'w') as f:
-                d = self.ui.settingsTab.serialize()
-                d['experiments'] = self.ui.experimentsTab.serialize()
-                json.dump(d, f, indent=4)
-            self.saved = True
+            with WaitCursor():
+                path = dlg.selectedFiles()[0]
+                with open(path, 'w') as f:
+                    d = self.ui.settingsTab.serialize()
+                    d['experiments'] = self.ui.experimentsTab.serialize()
+                    json.dump(d, f, indent=4)
+                self.saved = True
 
     def openClicked(self):
         dlg = QFileDialog(self)
@@ -85,11 +87,12 @@ class MainWidget(QWidget):
         if dlg.exec():
             path = dlg.selectedFiles()[0]
             try:
-                with open(path, 'r') as f:
-                    d = json.load(f)
-                    self.ui.settingsTab.unserialize(d)
-                    self.ui.experimentsTab.unserialize(d['experiments'])
-                self.saved = True
+                with WaitCursor():
+                    with open(path, 'r') as f:
+                        d = json.load(f)
+                        self.ui.settingsTab.unserialize(d)
+                        self.ui.experimentsTab.unserialize(d['experiments'])
+                    self.saved = True
             except BaseException as e:
                 QMessageBox.critical(self, "Error", str(e))
 

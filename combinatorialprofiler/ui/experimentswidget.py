@@ -56,7 +56,8 @@ class ExperimentsWidget(QWidget):
 
     def experimentRemoved(self, parent, first, last):
         for i in range(first, last + 1):
-            self.ui.stackedWidget.removeWidget(self.ui.stackedWidget.widget(i))
+            w = self.ui.stackedWidget.removeWidget(self.ui.stackedWidget.widget(i))
+            del w
         self.valid.emit(self.isValid())
 
     def experimentNameChanged(self):
@@ -66,9 +67,11 @@ class ExperimentsWidget(QWidget):
         return {self.ui.listWidget.item(i).text() : self.ui.stackedWidget.widget(i).serialize() for i in range(self.ui.listWidget.count())}
 
     def unserialize(self, d):
-        self.ui.listWidget.clear()
-        for n, e in d.items():
-            self.addExperiment(n, e)
+        # listWidget.clear() somehow doesn't emit rowsRemoved signal
+        #self.ui.listWidget.clear()
+        self.ui.listWidget.model().removeRows(0, self.ui.listWidget.model().rowCount())
+        for k in sorted(d.keys()):
+            self.addExperiment(k, d[k])
 
     def experimentValid(self, valid):
         self.evalid[self.sender()] = valid
