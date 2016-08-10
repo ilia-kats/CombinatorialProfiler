@@ -112,11 +112,11 @@ class TwoColumnWidget(QWidget):
         while len(selected):
             row = selected[-1].row()
             for col in range(2):
-                self.unique[col][self.byrow[col][row]] -= 1
                 t = self.byrow[col][row]
+                self.unique[col][t] -= 1
                 count = self.unique[col][t]
                 del self.byrow[col][row]
-                if count > 0:
+                if count > 0 or not t:
                     self.invalid[col] -= 1
                 if not count:
                     del self.unique[col][t]
