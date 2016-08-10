@@ -1,6 +1,8 @@
 #-*- coding: utf-8 -*-
 from io import StringIO
 
+from llist import dllist
+
 from pkg_resources import resource_stream
 
 from PyQt5.QtWidgets import QApplication, QWidget, QTableWidgetItem, QStyle, QMessageBox, QFileDialog
@@ -23,7 +25,7 @@ class TwoColumnWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.invalid = [0, 0]
-        self.byrow = ([], [])
+        self.byrow = (dllist(), dllist())
         self.unique = ({}, {})
         self.ui = self.__class__.ui[0]()
         self.ui.setupUi(self)

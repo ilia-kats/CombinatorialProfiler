@@ -51,7 +51,7 @@ def run_setup(with_binary=True):
     kw['entry_points'] = entry_points
     setup(name='CombinatorialProfiler',
         packages=find_packages(exclude=['test', 'tests']),
-        install_requires=['numpy', 'scipy', 'pandas>=0.15', 'matplotlib>=1.3', 'biopython'],
+        install_requires=['numpy', 'scipy', 'pandas>=0.15', 'matplotlib>=1.3', 'biopython', 'llist'],
         package_data={
             '': ['*.ui']
         },
