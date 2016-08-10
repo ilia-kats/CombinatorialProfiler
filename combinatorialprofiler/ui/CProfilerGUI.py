@@ -7,9 +7,9 @@ import json
 
 from pkg_resources import resource_stream
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QMessageBox, QStyle
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QMessageBox, QStyle, QAction
 from PyQt5.QtCore import pyqtRemoveInputHook
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QKeySequence
 from PyQt5 import uic
 
 from .experimentswidget import ExperimentsWidget
@@ -27,22 +27,29 @@ class MainWidget(QWidget):
         self.ui.setupUi(self)
 
         style = QApplication.style()
-        self.ui.saveBtn.setIcon(style.standardIcon(QStyle.SP_DialogSaveButton))
-        self.ui.openBtn.setIcon(style.standardIcon(QStyle.SP_DialogOpenButton))
-        self.ui.closeBtn.setIcon(style.standardIcon(QStyle.SP_DialogCloseButton))
-        self.ui.aboutBtn.setIcon(style.standardIcon(QStyle.SP_MessageBoxInformation))
-
-        self.ui.saveBtn.setEnabled(False)
-        self.ui.saveBtn.clicked.connect(self.saveClicked)
-        self.ui.openBtn.clicked.connect(self.openClicked)
-        self.ui.closeBtn.clicked.connect(self.close)
+        self.saveAction = QAction(style.standardIcon(QStyle.SP_DialogSaveButton), "Save", self)
+        self.openAction = QAction(style.standardIcon(QStyle.SP_DialogOpenButton), "Open", self)
+        self.closeAction = QAction(style.standardIcon(QStyle.SP_DialogCloseButton), "Close", self)
+        self.aboutAction = QAction(style.standardIcon(QStyle.SP_MessageBoxInformation), "About", self)
+        self.saveAction.setEnabled(False)
+        self.saveAction.triggered.connect(self.saveClicked)
+        self.openAction.triggered.connect(self.openClicked)
+        self.closeAction.triggered.connect(self.close)
         self.saved = True
+        self.aboutAction.triggered.connect(self.about)
 
-        self.ui.aboutBtn.clicked.connect(self.about)
+        self.saveAction.setShortcut(QKeySequence.Save)
+        self.openAction.setShortcut(QKeySequence.Open)
+        self.closeAction.setShortcut(QKeySequence.Close)
 
-        self.ui.experimentsTab.valid.connect(self.ui.saveBtn.setEnabled)
+        self.ui.experimentsTab.valid.connect(self.saveAction.setEnabled)
         self.ui.experimentsTab.valid.connect(self.changed)
         self.ui.settingsTab.changed.connect(self.changed)
+
+        self.ui.saveBtn.setDefaultAction(self.saveAction)
+        self.ui.openBtn.setDefaultAction(self.openAction)
+        self.ui.closeBtn.setDefaultAction(self.closeAction)
+        self.ui.aboutBtn.setDefaultAction(self.aboutAction)
 
     def changed(self):
         self.saved = False

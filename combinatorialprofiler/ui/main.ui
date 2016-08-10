@@ -62,28 +62,28 @@
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="saveBtn">
+      <widget class="ActionButton" name="saveBtn">
        <property name="text">
         <string>Save</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="openBtn">
+      <widget class="ActionButton" name="openBtn">
        <property name="text">
         <string>Open</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="aboutBtn">
+      <widget class="ActionButton" name="aboutBtn">
        <property name="text">
         <string>About</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="closeBtn">
+      <widget class="ActionButton" name="closeBtn">
        <property name="text">
         <string>Close</string>
        </property>
@@ -105,6 +105,11 @@
    <extends>QWidget</extends>
    <header>combinatorialprofiler.ui.settingswidget</header>
    <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>ActionButton</class>
+   <extends>QPushButton</extends>
+   <header>combinatorialprofiler.ui.actionbutton</header>
   </customwidget>
  </customwidgets>
  <resources/>
