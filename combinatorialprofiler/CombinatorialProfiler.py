@@ -35,6 +35,33 @@ def formatTime(seconds):
     else:
         return "%.1f hours" % (seconds / 3600)
 
+class TimeLogger:
+    def __init__(self, startmsg, stopmsg=None, level=logging.INFO):
+        self._startmsg = startmsg.capitalize()
+        if stopmsg:
+            self._stopmsg = stopmsg.capitalize()
+        else:
+            self._stopmsg = "Finished %s" % self._startmsg
+        self._level = level
+        self._appendstopmsg = ""
+
+    def __enter__(self):
+        self._starttime = time.monotonic()
+        logging.log(self._level, self._startmsg)
+
+    def __exit__(self, *args):
+        stop = time.monotonic()
+        logging.log(self._level, "%s after %s%s" % (self._stopmsg, formatTime(stop - self._starttime), self._appendstopmsg))
+
+    def setLevel(level):
+        self._level = level
+
+    def setStopMsg(msg):
+        self._stopmsg = msg
+
+    def appendToStopMsg(msg):
+        self._appendstopmsg = msg
+
 def normalizeCounts(df, sortedcells):
     categories = (df['experiment'].cat.categories.sort_values(), df['barcode_fw'].cat.categories.sort_values(), df['barcode_rev'].cat.categories.sort_values())
     df = df.set_index(['experiment','barcode_fw', 'barcode_rev','sequence'])
@@ -111,8 +138,6 @@ class PyExperimentJSONEncoder(json.JSONEncoder):
             return {o.name : o.toDict()}
 
 def exec_with_logging(args, pname, out=None, err=None):
-    logging.info("Starting %s" % pname)
-    logging.debug(" ".join(args))
     if out:
         outf = open(out, 'w')
     else:
@@ -121,19 +146,16 @@ def exec_with_logging(args, pname, out=None, err=None):
         errf = open(err, 'w')
     else:
         errf = sys.stderr
-    ctime1 = time.monotonic()
-    ret = subprocess.call(args, stdout=outf, stderr=errf)
-    ctime2 = time.monotonic()
-    infostr = "%s finished after %s" % (pname, formatTime(ctime2 - ctime1))
-    if not ret:
-        logging.info(infostr)
-    else:
-        logging.error("%s with returncode %d" % (infostr, ret))
-    return ret
 
-def plot_profiles(df, groupby, dspec, filename, experiment):
-    logging.info("Plotting read count profiles for experiment %s into %s" % (experiment, filename))
-    ctime1 = time.monotonic()
+    with TimeLogger("Starting %s" % pname, "%s finished" % pname) as tl:
+        logging.debug(" ".join(args))
+        ret = subprocess.call(args, stdout=outf, stderr=errf)
+        if ret:
+            tl.appendToStopMsg(" with returncode %d" % ret)
+            tl.setLevel(logging.ERROR)
+        return ret
+
+def plot_profiles(df, groupby, dspec, filename):
     labels = sorted(df[dspec.dsicol].cat.categories)
     integer_map = dict([(val, i) for i, val in enumerate(labels)])
     with PdfPages(filename) as pdf:
@@ -150,12 +172,8 @@ def plot_profiles(df, groupby, dspec, filename, experiment):
             plt.ylabel("normalized counts")
             pdf.savefig(bbox_inches='tight')
             plt.close()
-    ctime2 = time.monotonic()
-    logging.info("Finished plotting read count profiles after %s" % formatTime(ctime2 - ctime1))
 
-def plot_histograms(df, dspec, filename, experiment, quantile=1):
-    logging.info("Plotting read count histograms for experiment %s into %s" % (experiment, filename))
-    ctime1 = time.monotonic()
+def plot_histograms(df, dspec, filename, quantile=1):
     with PdfPages(filename) as pdf:
         for code, group in df.groupby(dspec.groupby):
             counts = group['counts_sum'][group['counts_sum'] <= group['counts_sum'].quantile(quantile)]
@@ -177,12 +195,8 @@ def plot_histograms(df, dspec, filename, experiment, quantile=1):
             plt.title(code)
             pdf.savefig(bbox_inches='tight')
             plt.close()
-    ctime2 = time.monotonic()
-    logging.info("Finished plotting read count histograms after %s" % formatTime(ctime2 - ctime1))
 
-def plot_correlations(df, dspec, limits, filename, experiment):
-    logging.info("Plotting DSI correlations for experiment %s into %s" % (experiment, filename))
-    ctime1 = time.monotonic()
+def plot_correlations(df, dspec, limits, filename):
     with PdfPages(filename) as pdf:
         for code, group in df.groupby(dspec.groupby):
             c = group['median_dsi'].corr(group['pooled_dsi'], method='spearman')
@@ -233,8 +247,6 @@ def plot_correlations(df, dspec, limits, filename, experiment):
             fig.suptitle(code, y=0.93)
             pdf.savefig(bbox_inches='tight')
             plt.close()
-    ctime2 = time.monotonic()
-    logging.info("Finished plotting DSI correlations after %s" % formatTime(ctime2 - ctime1))
 
 def dump_df(df, prefix):
     df.to_csv(prefix + '.csv', index=False, encoding='utf-8', float_format="%.10f")
@@ -377,11 +389,8 @@ def main():
             logging.info("Found raw counts for all experiments and resume is requested, continuing")
         else:
             args.resume = False
-            logging.info("Counting reads")
-            ctime1 = time.monotonic()
-            counter.countReads(os.path.join(intermediate_outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped"), args.threads)
-            ctime2 = time.monotonic()
-            logging.info("Finished counting reads after %s" % formatTime(ctime2 - ctime1))
+            with TimeLogger("counting reads"):
+                counter.countReads(os.path.join(intermediate_outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped"), args.threads)
             logging.info("{:,d} total reads".format(counter.read))
             logging.info("{:,d} counted reads".format(counter.counted))
             logging.info("{:,d} unmatched reads, thereof {:,d} reads that could not be matched to an insert, {:,d} reads without a barcode, {:,d} reads that could not be matched to a named insert".format(counter.unmatched_total, counter.unmatched_insert, counter.unmatched_barcodes, counter.unmatched_insert_sequence))
@@ -393,8 +402,8 @@ def main():
             args.resume = False
             counts = e.counts_df
             if len(e.sorted_cells):
-                logging.info("Normalizing counts for experiment %s" % e.name)
-                counts = normalizeCounts(counts, e.sorted_cells_df)
+                with TimeLogger("normalizing counts for experiment %s" % e.name):
+                    counts = normalizeCounts(counts, e.sorted_cells_df)
             counts['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in counts.itertuples()])
             dump_df(counts, rawcountsprefixes[e])
 
@@ -417,11 +426,8 @@ def main():
                 args.resume = False
                 dspec = getDSISpec(e)
                 if dspec:
-                    logging.info("Calculating DSIs for experiment %s" % e.name)
-                    ctime1 = time.monotonic()
-                    dsi_byaa, dsi_bynuc = getDSI(counts, dspec)
-                    ctime2 = time.monotonic()
-                    logging.info("Finished calculating DSIs after %s" % formatTime(ctime2 - ctime1))
+                    with TimeLogger("calculating DSIs for experiment %s" % e.name):
+                        dsi_byaa, dsi_bynuc = getDSI(counts, dspec)
 
                     dump_df(dsi_byaa, os.path.join(args.outdir, "%sDSIs_byaa" % prefixes[e]))
                     dump_df(dsi_bynuc, os.path.join(args.outdir, "%sDSIs_bynuc" % prefixes[e]))
@@ -430,17 +436,27 @@ def main():
                 if args.xkcd:
                     plt.xkcd()
 
-                plot_correlations(dsi_byaa, dspec, (1, counts[dspec.dsicol].cat.categories.size), os.path.join(args.outdir, "%sDSIs_byaa_cor.pdf" % prefixes[e]), e.name)
-                plot_correlations(dsi_byaa[~dsi_byaa['translation'].str.contains('*', regex=False)], dspec, (1, counts[dspec.dsicol].cat.categories.size), os.path.join(args.outdir, "%sDSIs_byaa_cor_nostop.pdf" % prefixes[e]), e.name)
+                ofile = os.path.join(args.outdir, "%sDSIs_byaa_cor.pdf" % prefixes[e])
+                with TimeLogger("plotting DSI correlations for experiment %s into %s" % (e.name, ofile), "finished plotting DSI correlations"):
+                    plot_correlations(dsi_byaa, dspec, (1, counts[dspec.dsicol].cat.categories.size), ofile)
+                ofile = os.path.join(args.outdir, "%sDSIs_byaa_cor_nostop.pdf" % prefixes[e])
+                with TimeLogger("plotting DSI correlations for experiment %s into %s" % (e.name, ofile), "finished plotting DSI correlations"):
+                    plot_correlations(dsi_byaa[~dsi_byaa['translation'].str.contains('*', regex=False)], dspec, (1, counts[dspec.dsicol].cat.categories.size), ofile)
 
                 histogramdir = os.path.join(args.outdir, "readcount_histograms")
                 os.makedirs(histogramdir, exist_ok=True)
                 for q in np.linspace(0.9, 1, 11):
-                    plot_histograms(dsi_bynuc, dspec, os.path.join(histogramdir, "%sDSIs_bynuc_readcounts_%.2f_quantile.pdf" % (prefixes[e], q)), e.name, q)
-                    plot_histograms(dsi_byaa, dspec, os.path.join(histogramdir, "%sDSIs_byaa_readcounts_%.2f_quantile.pdf" % (prefixes[e], q)), e.name, q)
+                    ofile = os.path.join(histogramdir, "%sDSIs_bynuc_readcounts_%.2f_quantile.pdf" % (prefixes[e], q))
+                    with TimeLogger("plotting read count histograms for experiment %s and quantile %.2f" % (e.name, q), "finished plotting read count histograms"):
+                        plot_histograms(dsi_bynuc, dspec, ofile, q)
+                        plot_histograms(dsi_byaa, dspec, os.path.join(histogramdir, "%sDSIs_byaa_readcounts_%.2f_quantile.pdf" % (prefixes[e], q)), q)
 
-                plot_profiles(counts, [dspec.groupby, dspec.seqcol], dspec, os.path.join(args.outdir, "%sbynuc_countplots.pdf" % prefixes[e]), e.name)
-                plot_profiles(counts.groupby([dspec.groupby, dspec.dsicol, 'translation'])['normalized_counts'].sum().reset_index(), [dspec.groupby, 'translation'], dspec, os.path.join(args.outdir, "%sbyaa_countplots.pdf" % prefixes[e]), e.name)
+                ofile = os.path.join(args.outdir, "%sbynuc_countplots.pdf" % prefixes[e])
+                with TimeLogger("plotting read count profiles for experiment %s into %s" % (e.name, ofile), "finished plotting read count profiles"):
+                    plot_profiles(counts, [dspec.groupby, dspec.seqcol], dspec, ofile)
+                ofile = os.path.join(args.outdir, "%sbyaa_countplots.pdf" % prefixes[e])
+                with TimeLogger("plotting read count profiles for experiment %s into %s" % (e.name, ofile), "finished plotting read count profiles"):
+                    plot_profiles(counts.groupby([dspec.groupby, dspec.dsicol, 'translation'])['normalized_counts'].sum().reset_index(), [dspec.groupby, 'translation'], dspec, ofile)
 
     stoptime = time.monotonic()
     logging.info("%s finished after %s" % (parser.prog, formatTime(stoptime - starttime)))
