@@ -37,11 +37,11 @@ def formatTime(seconds):
 
 class TimeLogger:
     def __init__(self, startmsg, stopmsg=None, level=logging.INFO):
-        self._startmsg = startmsg.capitalize()
+        self._startmsg = startmsg[:1].upper() + startmsg[1:]
         if stopmsg:
-            self._stopmsg = stopmsg.capitalize()
+            self._stopmsg = stopmsg[:1].upper() + stopmsg[1:]
         else:
-            self._stopmsg = "Finished %s" % self._startmsg
+            self._stopmsg = "Finished %s" % startmsg
         self._level = level
         self._appendstopmsg = ""
 
