@@ -27,12 +27,16 @@ class ExperimentsWidget(QWidget):
 
         self.ui.listWidget.model().rowsInserted.connect(self.rowsChanged)
         self.ui.listWidget.model().rowsRemoved.connect(self.rowsChanged)
+        self.ui.listWidget.selectionModel().selectionChanged.connect(self.selectionChanged)
 
         self.evalid = {}
         self.rowsChanged()
 
     def rowsChanged(self):
         self.ui.removeBtn.setEnabled(self.ui.listWidget.model().rowCount() > 0)
+
+    def selectionChanged(self, selected):
+        self.ui.removeBtn.setEnabled(len(selected) > 0)
 
     def addExperiment(self, name=None, d=None):
         if not name:

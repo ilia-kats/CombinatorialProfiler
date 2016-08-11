@@ -51,11 +51,15 @@ class TwoColumnWidget(QWidget):
 
         self.ui.seqTbl.model().rowsInserted.connect(self.rowsChanged)
         self.ui.seqTbl.model().rowsRemoved.connect(self.rowsChanged)
+        self.ui.seqTbl.selectionModel().selectionChanged.connect(self.selectionChanged)
 
         self.rowsChanged()
 
     def rowsChanged(self):
         self.ui.removeBtn.setEnabled(self.ui.seqTbl.model().rowCount() > 0)
+
+    def selectionChanged(self, selected):
+        self.ui.removeBtn.setEnabled(len(selected) > 0)
 
     def setLabel(self, label):
         self.ui.label.setText(label)
