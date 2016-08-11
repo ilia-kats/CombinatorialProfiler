@@ -111,23 +111,26 @@ class TwoColumnWidget(QWidget):
         self._fromFile(f)
 
     def removeSequences(self):
-        selected = self.ui.seqTbl.selectionModel().selectedRows()
-        with WaitCursor(len(selected) > 10):
-            while len(selected):
-                row = selected[-1].row()
-                for col in range(2):
-                    t = self.byrow[col][row]
-                    self.unique[col][t] -= 1
-                    count = self.unique[col][t]
-                    del self.byrow[col][row]
-                    if count > 0 or not t:
-                        self.invalid[col] -= 1
-                    if not count:
-                        del self.unique[col][t]
-
-                self.ui.seqTbl.removeRow(row)
-                self.rowRemoved.emit(row)
-                selected = self.ui.seqTbl.selectionModel().selectedRows()
+        selected = self.ui.seqTbl.selectionModel().selection()
+        with WaitCursor():
+            for i in range(len(selected)):
+                row = selected[i].bottom()
+                currnode = [self.byrow[col].nodeat(row) for col in range(2)]
+                prevnode = []
+                for r in range(row, selected[i].top() - 1, -1):
+                    for col in range(2):
+                        prevnode.append(currnode[col].prev)
+                        t = self.byrow[col].remove(currnode[col])
+                        self.unique[col][t] -= 1
+                        count = self.unique[col][t]
+                        if count > 0 or not t:
+                            self.invalid[col] -= 1
+                        if not count:
+                            del self.unique[col][t]
+                    currnode = prevnode
+                    prevnode = []
+                    self.ui.seqTbl.removeRow(r)
+                    self.rowRemoved.emit(r)
             self.valid.emit(self.isValid())
 
     def cellChanged(self, row, col):
