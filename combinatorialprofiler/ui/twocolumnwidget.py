@@ -1,7 +1,10 @@
 #-*- coding: utf-8 -*-
 from io import StringIO
 
-from llist import dllist
+try:
+    from llist import dllist
+except ImportError:
+    from pyllist import dllist
 
 from pkg_resources import resource_stream
 

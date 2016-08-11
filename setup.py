@@ -4,7 +4,7 @@ if sys.version < '3.4':
   print('Supported Python versions are 3.4 or a later 3.x version.')
   sys.exit(1)
 
-
+from distutils.errors import CompileError, DistutilsError
 from setuptools import setup, find_packages
 from setuptools.extension import Extension
 from setuptools.command.develop import develop
@@ -31,47 +31,53 @@ class debugmode(develop):
         readcounter.extra_compile_args.append("-O0")
         readcounter.undef_macros = ['NDEBUG']
 
-        print(readcounter.sources)
         cythonfile = readcounter.sources.index(readcounter_basepath + "readcounter.cpp")
         path, ext = os.path.splitext(readcounter.sources[cythonfile])
         readcounter.sources[cythonfile] = path + ".pyx"
-        readcounter = cythonize(readcounter)
+        readcounter = cythonize(readcounter)[0]
 
 
-def run_setup(with_binary=True):
-    entry_points = {
-            'gui_scripts':['CombinatorialProfilerGUI=combinatorialprofiler.ui.CProfilerGUI:main']
-        }
+dependencies = ['numpy', 'scipy', 'pandas>=0.15', 'matplotlib>=1.3', 'biopython', 'llist']
 
-    if with_binary:
-        kw = dict(setup_requires=['pytest_runner'], tests_require=['pytest'], ext_modules=[readcounter])
-        entry_points['console_scripts'] = ['CombinatorialProfiler=combinatorialprofiler.CombinatorialProfiler:main']
-    else:
-        kw = {}
-    kw['entry_points'] = entry_points
-    setup(name='CombinatorialProfiler',
-        packages=find_packages(exclude=['test', 'tests']),
-        install_requires=['numpy', 'scipy', 'pandas>=0.15', 'matplotlib>=1.3', 'biopython', 'llist'],
-        package_data={
-            '': ['*.ui']
-        },
-        cmdclass={
-            'develop': debugmode
-        },
-        zip_safe = True,
-        version=version,
-        description='Pipeline for analysis of combinatorial stability profiling data',
-        author="Ilia Kats",
-        author_email="i.kats@zmbh.uni-heidelberg.de",
-        license="GPLv2",
-        **kw
-    )
+def run_setup(deps, with_binary=True):
+    try:
+        entry_points = {
+                'gui_scripts':['CombinatorialProfilerGUI=combinatorialprofiler.ui.CProfilerGUI:main']
+            }
 
-try:
-    run_setup(True)
-except BaseException as e:
-    print('*' * 75)
-    print(e)
-    print('The readcounter extension could not be compiled. Only the GUI will be installed.')
-    print('*' * 75)
-    run_setup(False)
+        if with_binary:
+            kw = dict(setup_requires=['pytest_runner'], tests_require=['pytest'], ext_modules=[readcounter])
+            entry_points['console_scripts'] = ['CombinatorialProfiler=combinatorialprofiler.CombinatorialProfiler:main']
+        else:
+            kw = {}
+        kw['entry_points'] = entry_points
+        setup(name='CombinatorialProfiler',
+            packages=find_packages(exclude=['test', 'tests']),
+            install_requires=deps,
+            package_data={
+                '': ['*.ui']
+            },
+            cmdclass={
+                'develop': debugmode
+            },
+            zip_safe = True,
+            version=version,
+            description='Pipeline for analysis of combinatorial stability profiling data',
+            author="Ilia Kats",
+            author_email="i.kats@zmbh.uni-heidelberg.de",
+            license="GPLv2",
+            **kw
+        )
+    except BaseException as e:
+        if isinstance(e.__context__, CompileError):
+            print('*' * 75)
+            print(e)
+            print('The readcounter extension could not be compiled. Only the GUI will be installed.')
+            print('*' * 75)
+            run_setup(deps, False)
+        elif isinstance(e.__context__, DistutilsError) and e.__context__.args[0].find("'llist'") > -1:
+            deps[deps.index('llist')] = 'pyllist'
+            run_setup(deps, with_binary)
+
+run_setup(dependencies, True)
+
