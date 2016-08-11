@@ -66,6 +66,7 @@ def run_setup(deps, with_binary=True):
             author="Ilia Kats",
             author_email="i.kats@zmbh.uni-heidelberg.de",
             license="GPLv2",
+            dependency_links=['https://github.com/fuzeman/pypy-llist/tarball/master#egg=pyllist-0.1.1'],
             **kw
         )
     except BaseException as e:
@@ -75,7 +76,7 @@ def run_setup(deps, with_binary=True):
             print('The readcounter extension could not be compiled. Only the GUI will be installed.')
             print('*' * 75)
             run_setup(deps, False)
-        elif isinstance(e.__context__, DistutilsError) and e.__context__.args[0].find("'llist'") > -1:
+        elif isinstance(e.__context__, DistutilsError):
             deps[deps.index('llist')] = 'pyllist'
             run_setup(deps, with_binary)
 
