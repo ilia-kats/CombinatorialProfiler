@@ -11,6 +11,7 @@ import time
 import pickle
 
 import pandas as pd
+import feather
 import numpy as np
 import matplotlib as mpl
 mpl.use('PDF')
@@ -251,6 +252,7 @@ def plot_correlations(df, dspec, limits, filename):
 def dump_df(df, prefix):
     df.to_csv(prefix + '.csv', index=False, encoding='utf-8', float_format="%.10f")
     df.to_pickle(prefix + '.pkl')
+    feather.write_dataframe(df, prefix + '.feather')
 
 def read_df_if_exists(prefix, read=True):
     if os.path.isfile(prefix + '.pkl'):

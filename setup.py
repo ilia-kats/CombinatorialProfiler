@@ -40,6 +40,7 @@ class debugmode(develop):
 dependencies = ['numpy', 'scipy', 'pandas>=0.15', 'matplotlib>=1.3', 'biopython', 'llist']
 
 def run_setup(deps, with_binary=True):
+    ldeps = deps[:]
     try:
         entry_points = {
                 'gui_scripts':['CombinatorialProfilerGUI=combinatorialprofiler.ui.CProfilerGUI:main']
@@ -48,12 +49,13 @@ def run_setup(deps, with_binary=True):
         if with_binary:
             kw = dict(setup_requires=['pytest_runner'], tests_require=['pytest'], ext_modules=[readcounter])
             entry_points['console_scripts'] = ['CombinatorialProfiler=combinatorialprofiler.CombinatorialProfiler:main']
+            ldeps.append('feather-format')
         else:
             kw = {}
         kw['entry_points'] = entry_points
         setup(name='CombinatorialProfiler',
             packages=find_packages(exclude=['test', 'tests']),
-            install_requires=deps,
+            install_requires=ldeps,
             package_data={
                 '': ['*.ui']
             },
