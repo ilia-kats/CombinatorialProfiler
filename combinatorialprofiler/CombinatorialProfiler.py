@@ -9,6 +9,7 @@ import json
 import logging
 import time
 import pickle
+from distutils.version import StrictVersion
 
 import pandas as pd
 import feather
@@ -26,7 +27,7 @@ import Bio.Seq
 import Bio.Alphabet
 
 from .readcounter import PyHammingReadCounter, PySeqlevReadCounter, PyExperiment, DSIS
-from . import version
+from . import version, jsonversion
 
 def formatTime(seconds):
     if seconds < 60:
@@ -302,6 +303,16 @@ def main():
     # do this right away to make the user immediately aware of any exceptions that might occur due to
     # a malformed config file
     config = json.load(open(args.configuration))
+    if "version" not in config:
+        logging.warning("The JSON configuration file does not contain a version number. It may be incompatible with this program.")
+    else:
+        cversion = StrictVersion(config['version'])
+        if cversion.version[0] != jsonversion.version[0]:
+            logging.error("The JSON configuration file format is not compatible with this version of %s" % parser.prog)
+            raise InvalidArgumentException("Incompatible JSON version")
+        elif cversion.version[1] != jsonversion.version[1]:
+            logging.warning("The JSON configuration file format version does not match this version of %s. Incompatibilites should be handled gracefully, but unexpected results may occur." % parser.prog)
+
     experiments = []
     for k,v in config['experiments'].items():
         exp = PyExperiment(k, v)

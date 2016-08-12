@@ -4,6 +4,7 @@
 import os.path
 import sys
 import json
+from distutils.version import StrictVersion
 
 from pkg_resources import resource_stream
 
@@ -16,7 +17,9 @@ from .experimentswidget import ExperimentsWidget
 from .experimentwidget import ExperimentWidget
 from .aboutdialog import AboutDialog
 from .resources import resources
-from .util import WaitCursor
+from .util import WaitCursor, TempDefaultCursor
+
+from combinatorialprofiler import jsonversion
 
 class MainWidget(QWidget):
     ui = uic.loadUiType(resource_stream(__name__, "main.ui"))
@@ -88,6 +91,7 @@ class MainWidget(QWidget):
                 with open(path, 'w') as f:
                     d = self.ui.settingsTab.serialize()
                     d['experiments'] = self.ui.experimentsTab.serialize()
+                    d['version'] = str(jsonversion)
                     json.dump(d, f, indent=4)
                 self.setModified(False)
 
@@ -103,6 +107,18 @@ class MainWidget(QWidget):
                 with WaitCursor():
                     with open(path, 'r') as f:
                         d = json.load(f)
+                        warn = None
+                        if 'version' not in d:
+                            warn = "The JSON configuration file does not contain a version number. It may be incompatible with this program."
+                        else:
+                            cversion = StrictVersion(d['version'])
+                            if cversion.version[0] != jsonversion.version[0]:
+                                raise BaseException("The JSON configuration file format is not compatible with this version of %s" % QApplication.applicationDisplayName())
+                            elif cversion.version[1] != jsonversion.version[1]:
+                                warn = "The JSON configuration file format version does not match this version of %s. Incompatibilites should be handled gracefully, but unexpected results may occur." % QApplication.applicationDisplayName()
+                        if warn:
+                            with TempDefaultCursor():
+                                QMessageBox.warning(self, "Warning", warn)
                         self.ui.settingsTab.unserialize(d)
                         self.ui.experimentsTab.unserialize(d['experiments'])
                     self.setModified(False)

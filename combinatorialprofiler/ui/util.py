@@ -15,3 +15,10 @@ class WaitCursor:
     def __exit__(self, *args):
         if self._switch:
             QApplication.restoreOverrideCursor()
+
+class TempDefaultCursor:
+    def __enter__(self):
+        QApplication.setOverrideCursor(QCursor(Qt.ArrowCursor))
+
+    def __exit__(self, *args):
+        QApplication.restoreOverrideCursor()
