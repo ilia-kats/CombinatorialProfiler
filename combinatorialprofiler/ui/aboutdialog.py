@@ -23,7 +23,7 @@ class AboutDialog(QDialog):
 
         self.ui.okBtn.clicked.connect(self.accept)
         self.ui.okBtn.setIcon(style.standardIcon(QStyle.SP_DialogOkButton))
-        self.ui.aboutText.setText("%s version %s." % (QApplication.applicationName(), version))
+        self.ui.aboutText.setText("%s version %s." % (QApplication.applicationDisplayName(), version))
 
         logosize = self.ui.aboutText.fontMetrics().width(self.ui.aboutText.text())
         self.ui.knoplabLogo.setPixmap(QIcon(":/knoplablogo.svg").pixmap(logosize, logosize))

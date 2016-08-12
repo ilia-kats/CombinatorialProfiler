@@ -8,7 +8,7 @@ import json
 from pkg_resources import resource_stream
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QFileDialog, QMessageBox, QStyle, QAction
-from PyQt5.QtCore import pyqtRemoveInputHook
+from PyQt5.QtCore import pyqtRemoveInputHook, pyqtSignal
 from PyQt5.QtGui import QIcon, QKeySequence
 from PyQt5 import uic
 
@@ -20,6 +20,8 @@ from .util import WaitCursor
 
 class MainWidget(QWidget):
     ui = uic.loadUiType(resource_stream(__name__, "main.ui"))
+    currentFileChanged = pyqtSignal('QString')
+    modified = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -35,7 +37,7 @@ class MainWidget(QWidget):
         self.saveAction.triggered.connect(self.saveClicked)
         self.openAction.triggered.connect(self.openClicked)
         self.closeAction.triggered.connect(self.close)
-        self.saved = True
+        self.isModified = False
         self.aboutAction.triggered.connect(self.about)
 
         self.saveAction.setShortcut(QKeySequence.Save)
@@ -52,10 +54,14 @@ class MainWidget(QWidget):
         self.ui.aboutBtn.setDefaultAction(self.aboutAction)
 
     def changed(self):
-        self.saved = False
+        self.setModified(True)
+
+    def setModified(self, modified=True):
+        self.isModified = modified
+        self.modified.emit(self.isModified)
 
     def canQuit(self):
-        if not self.saved:
+        if self.isModified:
             btn = QMessageBox.question(self, "Close now?", "The current configuration has not been saved. Quit anyway?", defaultButton = QMessageBox.No)
             if btn == QMessageBox.No:
                 return False
@@ -83,7 +89,7 @@ class MainWidget(QWidget):
                     d = self.ui.settingsTab.serialize()
                     d['experiments'] = self.ui.experimentsTab.serialize()
                     json.dump(d, f, indent=4)
-                self.saved = True
+                self.setModified(False)
 
     def openClicked(self):
         dlg = QFileDialog(self)
@@ -99,7 +105,8 @@ class MainWidget(QWidget):
                         d = json.load(f)
                         self.ui.settingsTab.unserialize(d)
                         self.ui.experimentsTab.unserialize(d['experiments'])
-                    self.saved = True
+                    self.setModified(False)
+                    self.currentFileChanged.emit(path)
             except BaseException as e:
                 QMessageBox.critical(self, "Error", str(e))
 
@@ -107,11 +114,17 @@ class MainWidget(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.widget = MainWidget(parent)
-        self.setCentralWidget(self.widget)
+        w = MainWidget(parent)
+        self.setCentralWidget(w)
+        w.modified.connect(self.setWindowModified)
+        w.currentFileChanged.connect(self.fileChanged)
+        self.fileChanged()
+
+    def fileChanged(self, path=""):
+        self.setWindowTitle(("%s[*] - " % os.path.basename(path)) + QApplication.applicationDisplayName())
 
     def closeEvent(self, e):
-        if not self.widget.canQuit():
+        if not self.centralWidget().canQuit():
             e.ignore()
         else:
             super().closeEvent(e)
