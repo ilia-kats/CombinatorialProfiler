@@ -112,7 +112,7 @@ class ExperimentWidget(QWidget):
     def _fromFile(self, f):
         try:
             fwrows, revcols = self.getCellHeaderMapping()
-            cells = readCellCounts(f, fwrows.keys(), revcols.keys())
+            cells = readCellCounts(f, fwrows.keys(), revcols.keys(), True)
             for ((fw, rev), val) in cells.groupby(level=('barcode_fw', 'barcode_rev')):
                 if fw in fwrows and rev in revcols:
                     y = fwrows[fw]
