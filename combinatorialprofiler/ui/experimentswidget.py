@@ -59,7 +59,7 @@ class ExperimentsWidget(QWidget):
         self.ui.listWidget.takeItem(r)
 
     def experimentRemoved(self, parent, first, last):
-        for i in range(first, last + 1):
+        for i in range(last, first - 1, -1):
             w = self.ui.stackedWidget.widget(i)
             self.ui.stackedWidget.removeWidget(w)
             if w in self.evalid:
