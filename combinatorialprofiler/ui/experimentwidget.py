@@ -126,7 +126,7 @@ class ExperimentWidget(QWidget):
                 else:
                     continue
                 item = QTableWidgetItem(self.ui.sortedCellsTbl.itemPrototype())
-                item.setData(Qt.DisplayRole, str(float(val.iloc[0].values.squeeze())))
+                item.setData(Qt.DisplayRole, val.iloc[0].values.squeeze().item())
                 self.ui.sortedCellsTbl.setItem(y,x, item)
         except BaseException as e:
             QMessageBox.critical(self, "Error", str(e))

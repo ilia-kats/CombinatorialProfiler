@@ -60,7 +60,10 @@ class ExperimentsWidget(QWidget):
 
     def experimentRemoved(self, parent, first, last):
         for i in range(first, last + 1):
-            w = self.ui.stackedWidget.removeWidget(self.ui.stackedWidget.widget(i))
+            w = self.ui.stackedWidget.widget(i)
+            self.ui.stackedWidget.removeWidget(w)
+            if w in self.evalid:
+                del self.evalid[w]
             del w
         self.valid.emit(self.isValid())
 
@@ -82,8 +85,11 @@ class ExperimentsWidget(QWidget):
         self.valid.emit(self.isValid())
 
     def isValid(self):
+        n = self.ui.listWidget.count()
+        if not n:
+            return False
         seen = set()
-        for i in range(self.ui.listWidget.count()):
+        for i in range(n):
             t = self.ui.listWidget.item(i).text()
             if not t or t in seen:
                 return False

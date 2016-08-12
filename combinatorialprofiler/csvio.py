@@ -46,7 +46,7 @@ def readCellCounts(f, barcodes_fw=None, barcodes_rev=None):
         header = 0
     else:
         header = None
-    df = pd.read_csv(f, header=header, sep=None)
+    df = pd.read_csv(f, header=header, sep=None, engine='python')
     types = df.get_dtype_counts()
     if types['float64'] != df.columns.size - 1:
         valuecol = np.where(df.dtypes == 'float64')[0]
