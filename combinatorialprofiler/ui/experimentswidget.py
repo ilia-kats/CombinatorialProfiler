@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from pkg_resources import resource_stream
 
+import sip
+
 from PyQt5.QtWidgets import QWidget, QListWidgetItem
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5 import uic
@@ -64,7 +66,7 @@ class ExperimentsWidget(QWidget):
             self.ui.stackedWidget.removeWidget(w)
             if w in self.evalid:
                 del self.evalid[w]
-            del w
+            sip.delete(w)
         self.valid.emit(self.isValid())
 
     def experimentNameChanged(self):
