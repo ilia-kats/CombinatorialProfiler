@@ -2,6 +2,8 @@
 #define MATCH_H
 
 #include <string>
+#include <typeinfo>
+#include <type_traits>
 
 class NodeBase;
 class InsertNode;
@@ -20,13 +22,23 @@ public:
     virtual ~MatchBase();
 
     operator bool() const;
+    virtual operator float() const = 0;
 
     const NodeBase* node() const;
     virtual bool perfectMatch() const = 0;
 
+    friend bool operator<(const MatchBase &l, const MatchBase &r);
+    friend bool operator>(const MatchBase &l, const MatchBase &r);
+    friend bool operator<=(const MatchBase &l, const MatchBase &r);
+    friend bool operator>=(const MatchBase &l, const MatchBase &r);
+    friend bool operator==(const MatchBase &l, const MatchBase &r);
+    friend bool operator!=(const MatchBase &l, const MatchBase &r);
+
 protected:
     const NodeBase *m_node;
     bool m_match;
+
+    virtual bool lessThan(const MatchBase &o) const = 0;
 };
 
 template<typename T>
@@ -35,23 +47,15 @@ class Match : public MatchBase
 public:
     virtual ~Match() {}
 
-    virtual bool perfectMatch() const
+    virtual bool perfectMatch() const override
     {
-        return !m_mismatches;
+        return m_match && !m_mismatches;
     }
 
-    template<typename S>
-    friend bool operator<(const Match<S> &l, const Match<S> &r);
-    template<typename S>
-    friend bool operator>(const Match<S> &l, const Match<S> &r);
-    template<typename S>
-    friend bool operator<=(const Match<S> &l, const Match<S> &r);
-    template<typename S>
-    friend bool operator>=(const Match<S> &l, const Match<S> &r);
-    template<typename S>
-    friend bool operator==(const Match<S> &l, const Match<S> &r);
-    template<typename S>
-    friend bool operator!=(const Match<S> &l, const Match<S> &r);
+    virtual operator float() const override
+    {
+        return (float)m_mismatches;
+    }
 
 protected:
     Match(const NodeBase *n, bool m)
@@ -60,6 +64,16 @@ protected:
     Match(const NodeBase *n, bool m, T mismatches)
     : MatchBase(n, m), m_mismatches(mismatches)
     {}
+
+    virtual bool lessThan(const MatchBase &o) const override
+    {
+        if (typeid(o).hash_code() == typeid(*this).hash_code()) {
+            decltype(*this) r = dynamic_cast<decltype(*this)>(o);
+            return m_mismatches < r.m_mismatches;
+        } else {
+            return (float)(*this) < (float)(o);
+        }
+    }
 
     T m_mismatches;
 };
@@ -115,7 +129,7 @@ HammingBarcodeMatch<T>::HammingBarcodeMatch(const HammingBarcodeNode<T> *n)
 
 template<class T>
 SeqlevBarcodeMatch<T>::SeqlevBarcodeMatch(const SeqlevBarcodeNode<T> *n, std::string::size_type mismatches)
-: Match(n, mismatches <= n->allowedMismatches())
+: Match(n, mismatches <= n->allowedMismatches(), mismatches)
 {}
 
 template<class T>

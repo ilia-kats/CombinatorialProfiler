@@ -19,43 +19,37 @@ const NodeBase* MatchBase::node() const
     return m_node;
 }
 
-template<typename T>
-bool operator<(const Match<T> &l, const Match<T> &r)
+bool operator<(const MatchBase &l, const MatchBase &r)
 {
     if (l and !r)
         return true;
     else if (r and !l)
         return false;
     else
-        return l.m_mismatches < r.m_mismatches;
+        return l.lessThan(r);
 }
 
-template<typename T>
-bool operator>(const Match<T> &l, const Match<T> &r)
+bool operator>(const MatchBase &l, const MatchBase &r)
 {
     return r < l;
 }
 
-template<typename T>
-bool operator<=(const Match<T> &l, const Match<T> &r)
+bool operator<=(const MatchBase &l, const MatchBase &r)
 {
     return !(l > r);
 }
 
-template<typename T>
-bool operator>=(const Match<T> &l, const Match<T> &r)
+bool operator>=(const MatchBase &l, const MatchBase &r)
 {
     return !(l < r);
 }
 
-template<typename T>
-bool operator==(const Match<T> &l, const Match<T> &r)
+bool operator==(const MatchBase &l, const MatchBase &r)
 {
-    return l.match && r.match && l.m_mismatches == r.m_mismatches;
+    return !(l < r || l > r);
 }
 
-template<typename T>
-bool operator!=(const Match<T> &l, const Match<T> &r)
+bool operator!=(const MatchBase &l, const MatchBase &r)
 {
     return !(l == r);
 }
