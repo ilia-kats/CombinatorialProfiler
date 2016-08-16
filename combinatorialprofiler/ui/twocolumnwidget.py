@@ -141,6 +141,7 @@ class TwoColumnWidget(QWidget):
             self.valid.emit(self.isValid())
 
     def cellChanged(self, row, col):
+        #import ipdb;ipdb.set_trace()
         ot = self.byrow[col][row]
         nt = self.ui.seqTbl.item(row, col).text()
         if col == 0:
@@ -149,8 +150,10 @@ class TwoColumnWidget(QWidget):
         c = self.unique[col].get(nt, 0) + 1
         self.unique[col][nt] = c
         oldcount = self.unique[col][ot]
-        if c == 1 and (oldcount > 0 and ot != nt or oldcount == 0 and not ot and nt):
+        if oldcount == 1 and ot != nt or oldcount == 0 and not ot and nt:
             self.invalid[col] -= 1
+        if c > 1 and oldcount <= 1 and ot != nt:
+            self.invalid[col] += 1
         if not oldcount:
             del self.unique[col][self.byrow[col][row]]
         self.byrow[col][row] = nt
