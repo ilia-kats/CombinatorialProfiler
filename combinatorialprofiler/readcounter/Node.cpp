@@ -100,6 +100,8 @@ InsertNode::match_type* InsertNode::getMatch(const Read &rd, std::string::size_t
     std::string insert;
     auto it = rd.getSequence().cbegin();
     std::copy(it + start, it + end, std::inserter(insert, insert.begin()));
+    if (insert.find('N') != std::string::npos || insert.find('n') != std::string::npos)
+        return new InsertMatch(this, false);
     return new InsertMatch(this, mismatches, std::move(insert));
 }
 
