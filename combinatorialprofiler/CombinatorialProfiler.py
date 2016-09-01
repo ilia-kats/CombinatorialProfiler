@@ -132,6 +132,7 @@ def getDSI(df, dspec):
     byaa_stats = g.agg({'counts': statsfuns, 'normalized_counts': statsfuns})
     byaa_stats.columns = ['_'.join(col) for col in byaa_stats.columns.values]
     byaa_stats['nfractions'] = g[dspec.dsicol].nunique()
+    byaa_stats['nsequences'] = g['sequence'].nunique()
 
     return (pd.concat((byaa_median, byaa_pooled, byaa_stats), axis=1).reset_index().dropna(subset=('median_dsi', 'pooled_dsi')), pd.concat((byseq, byseq_stats), axis=1).reset_index().dropna(subset=['dsi']))
 
