@@ -4426,7 +4426,7 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_15sorted_cells_df___get__
  *                 barcode_fw.append(fw)
  *                 barcode_rev.append(rev)             # <<<<<<<<<<<<<<
  *                 counts.append(c)
- *         return pd.Series(counts, index=pd.MultiIndex.from_arrays((barcode_fw, barcode_rev), names=('barcode_fw', 'barcode_rev')))
+ *         return pd.Series(counts, index=pd.MultiIndex.from_arrays((barcode_fw, barcode_rev), names=('barcode_fw', 'barcode_rev')), name='sortedcells')
  */
       __pyx_t_12 = __Pyx_PyList_Append(__pyx_v_barcode_rev, __pyx_v_rev); if (unlikely(__pyx_t_12 == -1)) __PYX_ERR(0, 171, __pyx_L1_error)
 
@@ -4434,7 +4434,7 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_15sorted_cells_df___get__
  *                 barcode_fw.append(fw)
  *                 barcode_rev.append(rev)
  *                 counts.append(c)             # <<<<<<<<<<<<<<
- *         return pd.Series(counts, index=pd.MultiIndex.from_arrays((barcode_fw, barcode_rev), names=('barcode_fw', 'barcode_rev')))
+ *         return pd.Series(counts, index=pd.MultiIndex.from_arrays((barcode_fw, barcode_rev), names=('barcode_fw', 'barcode_rev')), name='sortedcells')
  * 
  */
       __pyx_t_12 = __Pyx_PyList_Append(__pyx_v_counts, __pyx_v_c); if (unlikely(__pyx_t_12 == -1)) __PYX_ERR(0, 172, __pyx_L1_error)
@@ -4462,7 +4462,7 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_15sorted_cells_df___get__
   /* "readcounter.pyx":173
  *                 barcode_rev.append(rev)
  *                 counts.append(c)
- *         return pd.Series(counts, index=pd.MultiIndex.from_arrays((barcode_fw, barcode_rev), names=('barcode_fw', 'barcode_rev')))             # <<<<<<<<<<<<<<
+ *         return pd.Series(counts, index=pd.MultiIndex.from_arrays((barcode_fw, barcode_rev), names=('barcode_fw', 'barcode_rev')), name='sortedcells')             # <<<<<<<<<<<<<<
  * 
  *     @property
  */
@@ -4510,6 +4510,7 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_15sorted_cells_df___get__
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_index, __pyx_t_13) < 0) __PYX_ERR(0, 173, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_13); __pyx_t_13 = 0;
+  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_name, __pyx_n_s_sortedcells) < 0) __PYX_ERR(0, 173, __pyx_L1_error)
   __pyx_t_13 = __Pyx_PyObject_Call(__pyx_t_6, __pyx_t_2, __pyx_t_1); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 173, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_13);
   __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
@@ -9964,7 +9965,7 @@ static int __Pyx_InitCachedConstants(void) {
   /* "readcounter.pyx":173
  *                 barcode_rev.append(rev)
  *                 counts.append(c)
- *         return pd.Series(counts, index=pd.MultiIndex.from_arrays((barcode_fw, barcode_rev), names=('barcode_fw', 'barcode_rev')))             # <<<<<<<<<<<<<<
+ *         return pd.Series(counts, index=pd.MultiIndex.from_arrays((barcode_fw, barcode_rev), names=('barcode_fw', 'barcode_rev')), name='sortedcells')             # <<<<<<<<<<<<<<
  * 
  *     @property
  */

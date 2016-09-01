@@ -111,7 +111,7 @@ class DFCreator:
                 barcode_fw.append(fw)
                 barcode_rev.append(rev)
                 counts.append(c)
-        self.sortedcells_df = pd.Series(counts, index=pd.MultiIndex.from_arrays((barcode_fw, barcode_rev), names=('barcode_fw', 'barcode_rev')))
+        self.sortedcells_df = pd.Series(counts, index=pd.MultiIndex.from_arrays((barcode_fw, barcode_rev), names=('barcode_fw', 'barcode_rev')), name='sortedcells')
 
 def test_dsicalc():
     random.seed(42)

@@ -170,7 +170,7 @@ cdef class PyExperiment:
                 barcode_fw.append(fw)
                 barcode_rev.append(rev)
                 counts.append(c)
-        return pd.Series(counts, index=pd.MultiIndex.from_arrays((barcode_fw, barcode_rev), names=('barcode_fw', 'barcode_rev')))
+        return pd.Series(counts, index=pd.MultiIndex.from_arrays((barcode_fw, barcode_rev), names=('barcode_fw', 'barcode_rev')), name='sortedcells')
 
     @property
     def name(self):

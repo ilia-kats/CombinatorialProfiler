@@ -67,7 +67,10 @@ class TimeLogger:
 def normalizeCounts(df, sortedcells):
     categories = (df['experiment'].cat.categories.sort_values(), df['barcode_fw'].cat.categories.sort_values(), df['barcode_rev'].cat.categories.sort_values())
     df = df.set_index(['experiment','barcode_fw', 'barcode_rev','sequence'])
-    df['normalized_counts'] = (df['counts'] / df.groupby(level=['barcode_fw', 'barcode_rev'])['counts'].transform(sum)).unstack(['experiment','sequence']).mul(sortedcells, axis=0).stack(['experiment','sequence']).reorder_levels(df.index.names).dropna()
+    counts_sum = df['counts'] / df.groupby(level=['barcode_fw', 'barcode_rev'])['counts'].transform(sum)
+    counts_sum.name = 'normalized_counts'
+    counts_sum = counts_sum.reset_index(['experiment', 'sequence']).join(sortedcells).set_index(['experiment', 'sequence'], append=True)
+    df['normalized_counts'] = (counts_sum['normalized_counts'] * counts_sum['sortedcells']).reorder_levels(df.index.names)
     df = df.reset_index()
     df['experiment'] = df['experiment'].astype("category", categories=categories[0])
     df['barcode_fw'] = df['barcode_fw'].astype("category", categories=categories[1])
