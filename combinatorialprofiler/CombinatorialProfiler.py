@@ -161,11 +161,14 @@ def exec_with_logging(args, pname, out=None, err=None):
             tl.setLevel(logging.ERROR)
         return ret
 
-def plot_profiles(df, groupby, dspec, filename):
+def plot_profiles(df, groupby, dspec, filename, min_counts=1):
     labels = sorted(df[dspec.dsicol].cat.categories)
     integer_map = dict([(val, i) for i, val in enumerate(labels)])
     with PdfPages(filename) as pdf:
         for (code, seq), group in df.groupby(groupby):
+            if group['counts'].sum() < min_counts:
+                continue
+
             fig = plt.figure(figsize=(5,3))
 
             xvals = group[dspec.dsicol].map(integer_map)
@@ -412,6 +415,7 @@ def main():
             logging.info("{:,d} counted reads".format(counter.counted))
             logging.info("{:,d} unmatched reads, thereof {:,d} reads that could not be matched to an insert, {:,d} reads without a barcode, {:,d} reads that could not be matched to a named insert".format(counter.unmatched_total, counter.unmatched_insert, counter.unmatched_barcodes, counter.unmatched_insert_sequence))
 
+    min_counts_plot = config.get('profile_plot_min_count', 1)
     for e in experiments:
         if args.resume and have_counts:
             counts = read_df_if_exists(rawcountsprefixes[e])
@@ -470,10 +474,10 @@ def main():
 
                 ofile = os.path.join(args.outdir, "%sbynuc_countplots.pdf" % prefixes[e])
                 with TimeLogger("plotting read count profiles for experiment %s into %s" % (e.name, ofile), "finished plotting read count profiles"):
-                    plot_profiles(counts, [dspec.groupby, dspec.seqcol], dspec, ofile)
+                    plot_profiles(counts, [dspec.groupby, dspec.seqcol], dspec, ofile, min_counts_plot)
                 ofile = os.path.join(args.outdir, "%sbyaa_countplots.pdf" % prefixes[e])
                 with TimeLogger("plotting read count profiles for experiment %s into %s" % (e.name, ofile), "finished plotting read count profiles"):
-                    plot_profiles(counts.groupby([dspec.groupby, dspec.dsicol, 'translation'])['normalized_counts'].sum().reset_index(), [dspec.groupby, 'translation'], dspec, ofile)
+                    plot_profiles(counts.groupby([dspec.groupby, dspec.dsicol, 'translation'])['normalized_counts'].sum().reset_index(), [dspec.groupby, 'translation'], dspec, ofile, min_counts_plot)
 
     stoptime = time.monotonic()
     logging.info("%s finished after %s" % (parser.prog, formatTime(stoptime - starttime)))

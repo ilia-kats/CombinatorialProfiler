@@ -32,12 +32,13 @@ class SettingsWidget(QWidget):
         self.ui.barcodeAlgoSettings.setCurrentIndex(self.ui.barcodeAlgo.currentIndex())
 
         self.resizer = ColumnResizer(self)
-        self.resizer.addWidgetsFromLayout(self.ui.formLayout, 0)
+        self.resizer.addWidgetsFromLayout(self.ui.top_formLayout, 0)
+        self.resizer.addWidgetsFromLayout(self.ui.bottom_formLayout, 0)
         self.resizer.addWidgetsFromLayout(self.ui.hamming.layout(), 0)
         self.resizer.addWidgetsFromLayout(self.ui.seqlev.layout(), 0)
 
     def serialize(self):
-        d = {"insert_mismatches" : self.ui.mismatches.value(), "barcode_match_algo" : str(self.BarcodeAlgo(self.ui.barcodeAlgo.currentIndex()))}
+        d = {"insert_mismatches" : self.ui.mismatches.value(), "barcode_match_algo" : str(self.BarcodeAlgo(self.ui.barcodeAlgo.currentIndex())), "profile_plot_min_count" : self.ui.plot_minCount.value()}
         d.update(self.ui.barcodeAlgoSettings.currentWidget().serialize())
         return d
 
@@ -45,3 +46,4 @@ class SettingsWidget(QWidget):
         self.ui.mismatches.setValue(d.get('insert_mismatches', 0))
         self.ui.barcodeAlgo.setCurrentIndex(self.BarcodeAlgo[d.get('barcode_match_algo', 'hamming')].value)
         self.ui.barcodeAlgoSettings.currentWidget().unserialize(d)
+        self.ui.plot_minCount.setValue(d.get('profile_plot_min_count', 2))
