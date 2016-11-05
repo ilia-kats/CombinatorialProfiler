@@ -3,8 +3,8 @@ from io import StringIO
 from pkg_resources import resource_stream
 
 from PyQt5.QtWidgets import QApplication, QWidget, QTableWidgetItem, QStyle, QMessageBox, QFileDialog
-from PyQt5.QtCore import QRegExp, Qt, pyqtSignal
-from PyQt5.QtGui import QDoubleValidator, QRegExpValidator, QIcon
+from PyQt5.QtCore import QRegularExpression, Qt, pyqtSignal
+from PyQt5.QtGui import QDoubleValidator, QRegularExpressionValidator, QIcon
 from PyQt5 import uic
 
 from .simpledelegate import SimpleDelegate
@@ -37,7 +37,7 @@ class ExperimentWidget(QWidget):
         self.ui.sortedCellsTbl.setItemDelegate(self.cellsdelegate)
         self.ui.sortedCellsTbl.cellChanged.connect(self._validChanged)
 
-        self.ui.insertSequence.setValidator(QRegExpValidator(QRegExp("^[atcg]+[n]+[atcg]+$", Qt.CaseInsensitive)))
+        self.ui.insertSequence.setValidator(QRegularExpressionValidator(QRegularExpression("^([atcg]+)?[n]+(?(1)[atcg]*|[atcg]+)$", QRegularExpression.CaseInsensitiveOption)))
 
         self.ui.fromFileBtn.clicked.connect(self.fromFile)
         self.ui.fromClipboardBtn.clicked.connect(self.fromClipboard)

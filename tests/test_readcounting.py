@@ -143,8 +143,9 @@ def reduce_barcodes(fq, cindex, tokeep_fw, tokeep_rev):
 def make_barcodes_dict(codes):
     return {str(i): c for i,c in enumerate(codes)}
 
-def simplecounts(tmpdir, mismatches):
-    fq = FastQCreator(tmpdir)
+def simplecounts(tmpdir, mismatches, fq=None):
+    if not fq:
+        fq = FastQCreator(tmpdir)
     exps = []
     for i in enumerate(fq.inserts):
         d = {}
@@ -169,6 +170,30 @@ def test_simplecounts(tmpdir):
 
 def test_simplecounts_nomismatches(tmpdir):
     simplecounts(tmpdir, 0)
+
+def test_simplecounts_5prime(tmpdir):
+    fq = FastQCreator(tmpdir)
+    for i in enumerate(fq.inserts):
+        fq.inserts[i[0]] = ''.join(i[1].rpartition('N')[0:2])
+    simplecounts(tmpdir, 0, fq)
+
+def test_simplecounts_3prime(tmpdir):
+    fq = FastQCreator(tmpdir)
+    for i in enumerate(fq.inserts):
+        fq.inserts[i[0]] = ''.join(i[1].partition('N')[1:3])
+    simplecounts(tmpdir, 0, fq)
+
+def test_simplecounts_5prime_hamming(tmpdir):
+    fq = FastQCreator(tmpdir)
+    for i in enumerate(fq.inserts):
+        fq.inserts[i[0]] = ''.join(i[1].rpartition('N')[0:2])
+    simplecounts(tmpdir, 1, fq)
+
+def test_simplecounts_3prime_hamming(tmpdir):
+    fq = FastQCreator(tmpdir)
+    for i in enumerate(fq.inserts):
+        fq.inserts[i[0]] = ''.join(i[1].partition('N')[1:3])
+    simplecounts(tmpdir, 1, fq)
 
 def test_namedinserts(tmpdir):
     fq = FastQCreator(tmpdir, ninserts=1)
