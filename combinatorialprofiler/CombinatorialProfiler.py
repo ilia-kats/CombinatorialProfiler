@@ -217,7 +217,7 @@ def plot_correlations(df, dspec, limits, filename):
 
             ax.set_xlabel("median DSI")
             ax.set_ylabel("pooled DSI")
-            ax.text(0.1, 0.9, "Spearman's $r = %.3g$" % c, transform=ax.transAxes)
+            ax.text(0.1, 0.9, r"$\rho = %.3g$" % c, transform=ax.transAxes)
             ax.set_aspect('equal', adjustable='box', anchor='C')
 
             nbins = (limits[1] - limits[0] + 1) * 5
