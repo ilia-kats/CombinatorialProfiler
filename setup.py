@@ -4,7 +4,8 @@ if sys.version < '3.4':
   print('Supported Python versions are 3.4 or a later 3.x version.')
   sys.exit(1)
 
-from distutils.errors import CompileError, DistutilsError
+from distutils.errors import DistutilsPlatformError
+from distutils import ccompiler
 from setuptools import setup, find_packages
 from setuptools.extension import Extension
 from setuptools.command.develop import develop
@@ -40,47 +41,44 @@ class debugmode(develop):
 dependencies = ['numpy', 'scipy', 'pandas>=0.15', 'matplotlib>=1.3', 'biopython', 'llist']
 
 def run_setup(deps, with_binary=True):
-    ldeps = deps[:]
+    entry_points = {
+            'gui_scripts':['CombinatorialProfilerGUI=combinatorialprofiler.ui.CProfilerGUI:main']
+        }
+
+    if with_binary:
+        kw = dict(setup_requires=['pytest_runner'], tests_require=['pytest'], ext_modules=[readcounter])
+        entry_points['console_scripts'] = ['CombinatorialProfiler=combinatorialprofiler.CombinatorialProfiler:main']
+        deps.append('feather-format')
+    else:
+        deps[deps.index('llist')] = 'pyllist'
+        kw = {}
+    kw['entry_points'] = entry_points
+    setup(name='CombinatorialProfiler',
+        packages=find_packages(exclude=['test', 'tests']),
+        install_requires=deps,
+        package_data={
+            '': ['*.ui']
+        },
+        cmdclass={
+            'develop': debugmode
+        },
+        zip_safe = True,
+        version=version,
+        description='Pipeline for analysis of combinatorial stability profiling data',
+        author="Ilia Kats",
+        author_email="i.kats@zmbh.uni-heidelberg.de",
+        license="GPLv2",
+        dependency_links=['https://github.com/fuzeman/pypy-llist/tarball/master#egg=pyllist-0.1.1'],
+        **kw
+    )
+
+comp = ccompiler.new_compiler()
+binary = True
+if comp.compiler_type == 'msvc':
     try:
-        entry_points = {
-                'gui_scripts':['CombinatorialProfilerGUI=combinatorialprofiler.ui.CProfilerGUI:main']
-            }
+        comp.initialize()
+    except DistutilsPlatformError:
+        binary = False
 
-        if with_binary:
-            kw = dict(setup_requires=['pytest_runner'], tests_require=['pytest'], ext_modules=[readcounter])
-            entry_points['console_scripts'] = ['CombinatorialProfiler=combinatorialprofiler.CombinatorialProfiler:main']
-            ldeps.append('feather-format')
-        else:
-            kw = {}
-        kw['entry_points'] = entry_points
-        setup(name='CombinatorialProfiler',
-            packages=find_packages(exclude=['test', 'tests']),
-            install_requires=ldeps,
-            package_data={
-                '': ['*.ui']
-            },
-            cmdclass={
-                'develop': debugmode
-            },
-            zip_safe = True,
-            version=version,
-            description='Pipeline for analysis of combinatorial stability profiling data',
-            author="Ilia Kats",
-            author_email="i.kats@zmbh.uni-heidelberg.de",
-            license="GPLv2",
-            dependency_links=['https://github.com/fuzeman/pypy-llist/tarball/master#egg=pyllist-0.1.1'],
-            **kw
-        )
-    except BaseException as e:
-        if isinstance(e.__context__, CompileError):
-            print('*' * 75)
-            print(e)
-            print('The readcounter extension could not be compiled. Only the GUI will be installed.')
-            print('*' * 75)
-            run_setup(deps, False)
-        elif isinstance(e.__context__, DistutilsError):
-            deps[deps.index('llist')] = 'pyllist'
-            run_setup(deps, with_binary)
-
-run_setup(dependencies, True)
+run_setup(dependencies, binary)
 
