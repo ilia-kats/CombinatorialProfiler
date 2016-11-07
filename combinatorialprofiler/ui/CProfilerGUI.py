@@ -20,6 +20,7 @@ from .resources import resources
 from .util import WaitCursor, TempDefaultCursor
 
 from combinatorialprofiler import jsonversion
+from . import progname
 
 class MainWidget(QWidget):
     ui = uic.loadUiType(resource_stream(__name__, "main.ui"))
@@ -149,6 +150,7 @@ def main():
     pyqtRemoveInputHook()
     app = QApplication(sys.argv)
     app.setWindowIcon(QIcon(":/icon.svg"))
+    app.setApplicationName(progname)
     main = MainWindow()
     main.resize(1280, 1024)
     main.show()
