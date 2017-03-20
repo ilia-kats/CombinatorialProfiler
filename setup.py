@@ -21,6 +21,7 @@ readcounter = Extension("combinatorialprofiler.readcounter",
         extra_compile_args=["-std=c++14"],
         extra_link_args=["-std=c++14"]
     )
+readcounter = [readcounter]
 
 class debugmode(develop):
     def __init__(self, dist, **kw):
@@ -29,13 +30,14 @@ class debugmode(develop):
         from Cython.Build import cythonize
         import os.path
         global readcounter
-        readcounter.extra_compile_args.append("-O0")
-        readcounter.undef_macros = ['NDEBUG']
+        rdcntr = readcounter[0]
+        rdcntr.extra_compile_args.append("-O0")
+        rdcntr.undef_macros = ['NDEBUG']
 
-        cythonfile = readcounter.sources.index(readcounter_basepath + "readcounter.cpp")
-        path, ext = os.path.splitext(readcounter.sources[cythonfile])
-        readcounter.sources[cythonfile] = path + ".pyx"
-        readcounter = cythonize(readcounter)[0]
+        cythonfile = rdcntr.sources.index(readcounter_basepath + "readcounter.cpp")
+        path, ext = os.path.splitext(rdcntr.sources[cythonfile])
+        rdcntr.sources[cythonfile] = path + ".pyx"
+        readcounter[0] = cythonize(readcounter)[0]
 
 
 dependencies = ['numpy', 'scipy', 'pandas>=0.15', 'matplotlib>=1.3', 'biopython', 'llist']
@@ -46,7 +48,7 @@ def run_setup(deps, with_binary=True):
         }
 
     if with_binary:
-        kw = dict(setup_requires=['pytest_runner'], tests_require=['pytest'], ext_modules=[readcounter])
+        kw = dict(setup_requires=['pytest_runner'], tests_require=['pytest'], ext_modules=readcounter)
         entry_points['console_scripts'] = ['CombinatorialProfiler=combinatorialprofiler.CombinatorialProfiler:main']
         deps.append('feather-format')
     else:
