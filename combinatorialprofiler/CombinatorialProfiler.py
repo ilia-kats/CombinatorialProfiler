@@ -56,13 +56,13 @@ class TimeLogger:
         stop = time.monotonic()
         logging.log(self._level, "%s after %s%s" % (self._stopmsg, formatTime(stop - self._starttime), self._appendstopmsg))
 
-    def setLevel(level):
+    def setLevel(self, level):
         self._level = level
 
-    def setStopMsg(msg):
+    def setStopMsg(self, msg):
         self._stopmsg = msg
 
-    def appendToStopMsg(msg):
+    def appendToStopMsg(self, msg):
         self._appendstopmsg = msg
 
 def normalizeCounts(df, sortedcells):
