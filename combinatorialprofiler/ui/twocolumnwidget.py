@@ -59,7 +59,9 @@ class TwoColumnWidget(QWidget):
         self.rowsChanged()
 
     def rowsChanged(self):
-        self.ui.removeBtn.setEnabled(self.ui.seqTbl.model().rowCount() > 0)
+        cnt = self.ui.seqTbl.model().rowCount()
+        self.ui.removeBtn.setEnabled(cnt > 0)
+        self.ui.nLbl.setText("%d sequence(s)" % cnt)
 
     def selectionChanged(self, selected):
         self.ui.removeBtn.setEnabled(len(selected) > 0)
