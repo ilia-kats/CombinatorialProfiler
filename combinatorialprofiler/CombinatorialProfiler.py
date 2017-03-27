@@ -50,6 +50,7 @@ class TimeLogger:
     def __enter__(self):
         self._starttime = time.monotonic()
         logging.log(self._level, self._startmsg)
+        return self
 
     def __exit__(self, *args):
         stop = time.monotonic()
