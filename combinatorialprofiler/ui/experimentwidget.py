@@ -66,7 +66,7 @@ class ExperimentWidget(QWidget):
 
         if not self.ui.barcodes_rev.count() and not self.ui.sortedCellsTbl.columnCount():
             self.ui.sortedCellsTbl.insertColumn(0)
-            self.ui.sortedCellsTbl.setHorizontalHeaderItem(0, QTableWidgetItem())
+            self.ui.sortedCellsTbl.setHorizontalHeaderItem(0, QTableWidgetItem(''))
         self.ui.sortedCellsTbl.resizeColumnsToContents()
 
     def fwCodeChanged(self, row, text):
@@ -90,7 +90,7 @@ class ExperimentWidget(QWidget):
 
         if not self.ui.barcodes_fw.count() and not self.ui.sortedCellsTbl.rowCount():
             self.ui.sortedCellsTbl.insertRow(0)
-            self.ui.sortedCellsTbl.setVerticalHeaderItem(0, QTableWidgetItem())
+            self.ui.sortedCellsTbl.setVerticalHeaderItem(0, QTableWidgetItem(''))
         self.ui.sortedCellsTbl.resizeColumnsToContents()
 
     def revCodeChanged(self, column, text):
