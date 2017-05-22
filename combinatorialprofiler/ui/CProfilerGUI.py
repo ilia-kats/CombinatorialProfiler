@@ -95,6 +95,7 @@ class MainWidget(QWidget):
                     d['version'] = str(jsonversion)
                     json.dump(d, f, indent=4)
                 self.setModified(False)
+                self.currentFileChanged.emit(path)
 
     def openClicked(self):
         dlg = QFileDialog(self)
