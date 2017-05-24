@@ -149,8 +149,8 @@ cdef class PyExperiment:
                 counts.append(cnts)
         df = pd.DataFrame()
         df['experiment'] = pd.Series(experiment, dtype='category')
-        df['barcode_fw'] = pd.Categorical(barcode_fw, categories=self.forward_barcodes.values())
-        df['barcode_rev'] = pd.Categorical(barcode_rev, categories=self.reverse_barcodes.values())
+        df['barcode_fw'] = pd.Categorical(barcode_fw, categories=sorted(self.forward_barcodes.values()))
+        df['barcode_rev'] = pd.Categorical(barcode_rev, categories=sorted(self.reverse_barcodes.values()))
         df['sequence'] = sequence
         df['counts'] = counts
 

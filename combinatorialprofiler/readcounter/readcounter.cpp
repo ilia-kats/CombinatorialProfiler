@@ -3571,7 +3571,8 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_9counts_df___get__(struct
   PyObject *(*__pyx_t_10)(PyObject *);
   PyObject *__pyx_t_11 = NULL;
   int __pyx_t_12;
-  int __pyx_t_13;
+  PyObject *__pyx_t_13 = NULL;
+  int __pyx_t_14;
   __Pyx_RefNannySetupContext("__get__", 0);
 
   /* "readcounter.pyx":135
@@ -3981,7 +3982,7 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_9counts_df___get__(struct
  *                 counts.append(cnts)
  *         df = pd.DataFrame()             # <<<<<<<<<<<<<<
  *         df['experiment'] = pd.Series(experiment, dtype='category')
- *         df['barcode_fw'] = pd.Categorical(barcode_fw, categories=self.forward_barcodes.values())
+ *         df['barcode_fw'] = pd.Categorical(barcode_fw, categories=sorted(self.forward_barcodes.values()))
  */
   __pyx_t_6 = __Pyx_GetModuleGlobalName(__pyx_n_s_pd); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 150, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
@@ -4013,8 +4014,8 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_9counts_df___get__(struct
  *                 counts.append(cnts)
  *         df = pd.DataFrame()
  *         df['experiment'] = pd.Series(experiment, dtype='category')             # <<<<<<<<<<<<<<
- *         df['barcode_fw'] = pd.Categorical(barcode_fw, categories=self.forward_barcodes.values())
- *         df['barcode_rev'] = pd.Categorical(barcode_rev, categories=self.reverse_barcodes.values())
+ *         df['barcode_fw'] = pd.Categorical(barcode_fw, categories=sorted(self.forward_barcodes.values()))
+ *         df['barcode_rev'] = pd.Categorical(barcode_rev, categories=sorted(self.reverse_barcodes.values()))
  */
   __pyx_t_2 = __Pyx_GetModuleGlobalName(__pyx_n_s_pd); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 151, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
@@ -4040,8 +4041,8 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_9counts_df___get__(struct
   /* "readcounter.pyx":152
  *         df = pd.DataFrame()
  *         df['experiment'] = pd.Series(experiment, dtype='category')
- *         df['barcode_fw'] = pd.Categorical(barcode_fw, categories=self.forward_barcodes.values())             # <<<<<<<<<<<<<<
- *         df['barcode_rev'] = pd.Categorical(barcode_rev, categories=self.reverse_barcodes.values())
+ *         df['barcode_fw'] = pd.Categorical(barcode_fw, categories=sorted(self.forward_barcodes.values()))             # <<<<<<<<<<<<<<
+ *         df['barcode_rev'] = pd.Categorical(barcode_rev, categories=sorted(self.reverse_barcodes.values()))
  *         df['sequence'] = sequence
  */
   __pyx_t_7 = __Pyx_GetModuleGlobalName(__pyx_n_s_pd); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 152, __pyx_L1_error)
@@ -4056,29 +4057,35 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_9counts_df___get__(struct
   PyTuple_SET_ITEM(__pyx_t_7, 0, __pyx_v_barcode_fw);
   __pyx_t_2 = PyDict_New(); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 152, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_n_s_forward_barcodes); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 152, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_11 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_values); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 152, __pyx_L1_error)
+  __pyx_t_11 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_n_s_forward_barcodes); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 152, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_11);
-  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_t_3 = NULL;
-  if (CYTHON_UNPACK_METHODS && likely(PyMethod_Check(__pyx_t_11))) {
-    __pyx_t_3 = PyMethod_GET_SELF(__pyx_t_11);
-    if (likely(__pyx_t_3)) {
-      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_11);
-      __Pyx_INCREF(__pyx_t_3);
+  __pyx_t_13 = __Pyx_PyObject_GetAttrStr(__pyx_t_11, __pyx_n_s_values); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 152, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_13);
+  __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+  __pyx_t_11 = NULL;
+  if (CYTHON_UNPACK_METHODS && likely(PyMethod_Check(__pyx_t_13))) {
+    __pyx_t_11 = PyMethod_GET_SELF(__pyx_t_13);
+    if (likely(__pyx_t_11)) {
+      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_13);
+      __Pyx_INCREF(__pyx_t_11);
       __Pyx_INCREF(function);
-      __Pyx_DECREF_SET(__pyx_t_11, function);
+      __Pyx_DECREF_SET(__pyx_t_13, function);
     }
   }
-  if (__pyx_t_3) {
-    __pyx_t_1 = __Pyx_PyObject_CallOneArg(__pyx_t_11, __pyx_t_3); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 152, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  if (__pyx_t_11) {
+    __pyx_t_3 = __Pyx_PyObject_CallOneArg(__pyx_t_13, __pyx_t_11); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 152, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
   } else {
-    __pyx_t_1 = __Pyx_PyObject_CallNoArg(__pyx_t_11); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 152, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyObject_CallNoArg(__pyx_t_13); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 152, __pyx_L1_error)
   }
-  __Pyx_GOTREF(__pyx_t_1);
-  __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_DECREF(__pyx_t_13); __pyx_t_13 = 0;
+  __pyx_t_13 = PySequence_List(__pyx_t_3); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 152, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_13);
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __pyx_t_1 = ((PyObject*)__pyx_t_13);
+  __pyx_t_13 = 0;
+  __pyx_t_12 = PyList_Sort(__pyx_t_1); if (unlikely(__pyx_t_12 == -1)) __PYX_ERR(0, 152, __pyx_L1_error)
   if (PyDict_SetItem(__pyx_t_2, __pyx_n_s_categories, __pyx_t_1) < 0) __PYX_ERR(0, 152, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __pyx_t_1 = __Pyx_PyObject_Call(__pyx_t_6, __pyx_t_7, __pyx_t_2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 152, __pyx_L1_error)
@@ -4091,8 +4098,8 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_9counts_df___get__(struct
 
   /* "readcounter.pyx":153
  *         df['experiment'] = pd.Series(experiment, dtype='category')
- *         df['barcode_fw'] = pd.Categorical(barcode_fw, categories=self.forward_barcodes.values())
- *         df['barcode_rev'] = pd.Categorical(barcode_rev, categories=self.reverse_barcodes.values())             # <<<<<<<<<<<<<<
+ *         df['barcode_fw'] = pd.Categorical(barcode_fw, categories=sorted(self.forward_barcodes.values()))
+ *         df['barcode_rev'] = pd.Categorical(barcode_rev, categories=sorted(self.reverse_barcodes.values()))             # <<<<<<<<<<<<<<
  *         df['sequence'] = sequence
  *         df['counts'] = counts
  */
@@ -4108,29 +4115,35 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_9counts_df___get__(struct
   PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_v_barcode_rev);
   __pyx_t_7 = PyDict_New(); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 153, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
-  __pyx_t_11 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_n_s_reverse_barcodes); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 153, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_11);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_11, __pyx_n_s_values); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 153, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_n_s_reverse_barcodes); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 153, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
-  __pyx_t_11 = NULL;
-  if (CYTHON_UNPACK_METHODS && likely(PyMethod_Check(__pyx_t_3))) {
-    __pyx_t_11 = PyMethod_GET_SELF(__pyx_t_3);
-    if (likely(__pyx_t_11)) {
-      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_3);
-      __Pyx_INCREF(__pyx_t_11);
+  __pyx_t_11 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_values); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 153, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_11);
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __pyx_t_3 = NULL;
+  if (CYTHON_UNPACK_METHODS && likely(PyMethod_Check(__pyx_t_11))) {
+    __pyx_t_3 = PyMethod_GET_SELF(__pyx_t_11);
+    if (likely(__pyx_t_3)) {
+      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_11);
+      __Pyx_INCREF(__pyx_t_3);
       __Pyx_INCREF(function);
-      __Pyx_DECREF_SET(__pyx_t_3, function);
+      __Pyx_DECREF_SET(__pyx_t_11, function);
     }
   }
-  if (__pyx_t_11) {
-    __pyx_t_6 = __Pyx_PyObject_CallOneArg(__pyx_t_3, __pyx_t_11); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 153, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+  if (__pyx_t_3) {
+    __pyx_t_13 = __Pyx_PyObject_CallOneArg(__pyx_t_11, __pyx_t_3); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 153, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   } else {
-    __pyx_t_6 = __Pyx_PyObject_CallNoArg(__pyx_t_3); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 153, __pyx_L1_error)
+    __pyx_t_13 = __Pyx_PyObject_CallNoArg(__pyx_t_11); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 153, __pyx_L1_error)
   }
-  __Pyx_GOTREF(__pyx_t_6);
-  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __Pyx_GOTREF(__pyx_t_13);
+  __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+  __pyx_t_11 = PySequence_List(__pyx_t_13); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 153, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_11);
+  __Pyx_DECREF(__pyx_t_13); __pyx_t_13 = 0;
+  __pyx_t_6 = ((PyObject*)__pyx_t_11);
+  __pyx_t_11 = 0;
+  __pyx_t_12 = PyList_Sort(__pyx_t_6); if (unlikely(__pyx_t_12 == -1)) __PYX_ERR(0, 153, __pyx_L1_error)
   if (PyDict_SetItem(__pyx_t_7, __pyx_n_s_categories, __pyx_t_6) < 0) __PYX_ERR(0, 153, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
   __pyx_t_6 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_1, __pyx_t_7); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 153, __pyx_L1_error)
@@ -4142,8 +4155,8 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_9counts_df___get__(struct
   __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
 
   /* "readcounter.pyx":154
- *         df['barcode_fw'] = pd.Categorical(barcode_fw, categories=self.forward_barcodes.values())
- *         df['barcode_rev'] = pd.Categorical(barcode_rev, categories=self.reverse_barcodes.values())
+ *         df['barcode_fw'] = pd.Categorical(barcode_fw, categories=sorted(self.forward_barcodes.values()))
+ *         df['barcode_rev'] = pd.Categorical(barcode_rev, categories=sorted(self.reverse_barcodes.values()))
  *         df['sequence'] = sequence             # <<<<<<<<<<<<<<
  *         df['counts'] = counts
  * 
@@ -4151,7 +4164,7 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_9counts_df___get__(struct
   if (unlikely(PyObject_SetItem(__pyx_v_df, __pyx_n_s_sequence, __pyx_v_sequence) < 0)) __PYX_ERR(0, 154, __pyx_L1_error)
 
   /* "readcounter.pyx":155
- *         df['barcode_rev'] = pd.Categorical(barcode_rev, categories=self.reverse_barcodes.values())
+ *         df['barcode_rev'] = pd.Categorical(barcode_rev, categories=sorted(self.reverse_barcodes.values()))
  *         df['sequence'] = sequence
  *         df['counts'] = counts             # <<<<<<<<<<<<<<
  * 
@@ -4167,8 +4180,8 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_9counts_df___get__(struct
  * 
  */
   __pyx_t_4 = PyObject_Length(__pyx_v_insertsdict); if (unlikely(__pyx_t_4 == -1)) __PYX_ERR(0, 157, __pyx_L1_error)
-  __pyx_t_13 = (__pyx_t_4 != 0);
-  if (__pyx_t_13) {
+  __pyx_t_14 = (__pyx_t_4 != 0);
+  if (__pyx_t_14) {
 
     /* "readcounter.pyx":158
  * 
@@ -4236,6 +4249,7 @@ static PyObject *__pyx_pf_11readcounter_12PyExperiment_9counts_df___get__(struct
   __Pyx_XDECREF(__pyx_t_6);
   __Pyx_XDECREF(__pyx_t_7);
   __Pyx_XDECREF(__pyx_t_11);
+  __Pyx_XDECREF(__pyx_t_13);
   __Pyx_AddTraceback("readcounter.PyExperiment.counts_df.__get__", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;

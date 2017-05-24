@@ -19,9 +19,13 @@ mpl.use('PDF')
 mpl.rcParams['pdf.fonttype'] = 42
 mpl.rcParams['ps.fonttype'] = 42
 from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.tight_layout import get_renderer
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.stats import gaussian_kde
+from scipy.stats import norm
+
+from sklearn.mixture import GaussianMixture
 
 import Bio.Seq
 import Bio.Alphabet
@@ -66,16 +70,13 @@ class TimeLogger:
         self._appendstopmsg = msg
 
 def normalizeCounts(df, sortedcells):
-    categories = (df['experiment'].cat.categories.sort_values(), df['barcode_fw'].cat.categories.sort_values(), df['barcode_rev'].cat.categories.sort_values())
     df = df.set_index(['experiment','barcode_fw', 'barcode_rev','sequence'])
+
     counts_sum = df['counts'] / df.groupby(level=['barcode_fw', 'barcode_rev'])['counts'].transform(sum)
     counts_sum.name = 'normalized_counts'
     counts_sum = counts_sum.reset_index(['experiment', 'sequence']).join(sortedcells).set_index(['experiment', 'sequence'], append=True)
     df['normalized_counts'] = (counts_sum['normalized_counts'] * counts_sum['sortedcells']).reorder_levels(df.index.names)
     df = df.reset_index()
-    df['experiment'] = df['experiment'].astype("category", categories=categories[0])
-    df['barcode_fw'] = df['barcode_fw'].astype("category", categories=categories[1])
-    df['barcode_rev'] = df['barcode_rev'].astype("category", categories=categories[2])
     return df
 
 class DSISpec(object):
@@ -108,7 +109,7 @@ def getDSISpec(e):
 def getDSI(df, dspec):
     statsfuns = ['min', 'max', 'mean', 'median', 'std', 'sum']
 
-    fractionvals = pd.Series(range(1, df[dspec.dsicol].cat.categories.size + 1), index=sorted(df[dspec.dsicol].cat.categories))
+    fractionvals = pd.Series(range(1, df[dspec.dsicol].cat.categories.size + 1), index=df[dspec.dsicol].cat.categories)
 
     df['normalized_counts_cells'] = df.set_index(dspec.dsicol, append=True)['normalized_counts'].mul(fractionvals, level=dspec.dsicol).reset_index(level=dspec.dsicol, drop=True)
 
@@ -163,7 +164,7 @@ def exec_with_logging(args, pname, out=None, err=None):
         return ret
 
 def plot_profiles(df, groupby, dspec, filename, min_counts=1):
-    labels = sorted(df[dspec.dsicol].cat.categories)
+    labels = df[dspec.dsicol].cat.categories
     integer_map = dict([(val, i) for i, val in enumerate(labels)])
     with PdfPages(filename) as pdf:
         for (code, seq), group in df.groupby(groupby):
@@ -258,6 +259,71 @@ def plot_correlations(df, dspec, limits, filename):
             pdf.savefig(bbox_inches='tight')
             plt.close()
 
+def subtract_background(df, filename):
+    mix = GaussianMixture(n_components=2, tol=1e-8, max_iter=int(1e4))
+    def bgsubt(g):
+        mix.fit(np.log10(g['counts'].values.reshape(-1, 1)))
+        means = mix.means_.reshape(-1)
+        covs = mix.covariances_.reshape(-1)
+        ubounds = 10 ** norm.ppf(0.975, means, covs)
+        bg_comp = ubounds.argmin()
+        g['counts'] = np.maximum(0, g['counts'].values - 10**means[bg_comp])
+        return g
+    grouped = df.groupby(['barcode_fw', 'barcode_rev'])
+    subt = grouped.apply(bgsubt)#.astype({'barcode_fw':'category', 'barcode_rev': 'category'})
+
+    dfs = (df, subt)
+    title = ('raw read counts', 'background-subtracted read counts')
+    with PdfPages(filename) as pdf:
+        fw = subt['barcode_fw'].cat.categories.sort_values()
+        rev = subt['barcode_rev'].cat.categories.sort_values()
+        for i in range(2):
+            grouped = dfs[i].query("counts > 0").groupby(['barcode_fw', 'barcode_rev'])
+            fig, ax = plt.subplots(nrows=fw.size, ncols=rev.size, sharex=True, sharey=True, squeeze=False)
+            plt.subplots_adjust(left=0.125, right=0.9, bottom=0.1, top=0.9, wspace=0, hspace=0)
+
+            w = 2 * rev.size
+            h = 0.5 * fw.size
+            w *= 1 / (fig.subplotpars.right - fig.subplotpars.left)
+            h *= 1 / (fig.subplotpars.top - fig.subplotpars.bottom)
+
+            fig.set_size_inches(w, h)
+
+            for y in range(fw.size):
+                for x in range(rev.size):
+                    ax[y,x].set_xscale("log")
+                    ax[y,x].xaxis.get_major_locator().set_params(numticks=10)
+                    ax[y,x].xaxis.get_minor_locator().set_params(numticks=1000)
+                    try:
+                        g = grouped.get_group((fw[y], rev[x]))
+                    except KeyError:
+                        continue
+                    c = g['counts']
+                    nbins = min(100, int(c.size / 10))
+                    ax[y, x].hist(c, bins=np.logspace(np.log10(c.min()), np.log10(c.max()), nbins), color="#000000", alpha=0.66, edgecolor='none')
+                    #if x > 0:
+                        #plt.setp(ax[y, x].get_yticklines(), visible=False)
+                    #if y < fw.size - 1:
+                        #xax = ax[y, x].get_xaxis()
+                        #plt.setp(xax.get_majorticklines(), visible=False)
+                        #plt.setp(xax.get_minorticklines(), visible=False)
+            maxx = rev.size - 1
+            for y in range(fw.size):
+                ax[y, maxx].get_yaxis().set_label_position('right')
+                ax[y, maxx].set_ylabel(fw[y], rotation="horizontal", ha="left", va="center")
+            for x in range(rev.size):
+                ax[0, x].get_xaxis().set_label_position('top')
+                ax[0, x].set_xlabel(rev[x])
+
+            box = fig.get_tightbbox(get_renderer(fig))
+            fig.text(0.5, (box.ymin - 0.1) / h, "read counts", ha="center")
+            fig.text((box.xmin - 0.2) / w, 0.5, "frequency", va="center", rotation="vertical")
+            fig.suptitle(title[i], y=(box.ymax + 0.2) / h)
+
+            pdf.savefig(bbox_inches="tight")
+            plt.close()
+    return subt
+
 def dump_df(df, prefix):
     df.to_csv(prefix + '.csv', index=False, encoding='utf-8', float_format="%.10f")
     df.to_pickle(prefix + '.pkl')
@@ -270,7 +336,7 @@ def read_df_if_exists(prefix, read=True):
         else:
             return os.path.getmtime(prefix + '.pkl')
     else:
-        return None
+        return False
 
 class InvalidArgumentException(BaseException):
     pass
@@ -395,6 +461,7 @@ def main():
 
         prefixes = {}
         rawcountsprefixes = {}
+        rawcountsprefixes_bgsubt = {}
         have_counts = True
         for e in experiments:
             if not len(e.name):
@@ -402,9 +469,13 @@ def main():
             else:
                 prefixes[e] = "%s_" % e.name
             rawcountsprefixes[e] = os.path.join(args.outdir, "%sraw_counts" % prefixes[e])
-            ex = read_df_if_exists(rawcountsprefixes[e], False)
-            if ex is None or ex < os.path.getmtime(args.configuration):
-                have_counts = False
+            rawcountsprefixes_bgsubt[e] = os.path.join(args.outdir, "%sraw_counts_backgroundsubtracted" % prefixes[e])
+
+            for pre in (rawcountsprefixes[e], rawcountsprefixes_bgsubt[e]):
+                ex = read_df_if_exists(pre, False)
+                if not ex or ex < os.path.getmtime(args.configuration):
+                    have_counts = False
+                    break
 
         if args.resume and have_counts:
             logging.info("Found raw counts for all experiments and resume is requested, continuing")
@@ -417,68 +488,92 @@ def main():
             logging.info("{:,d} unmatched reads, thereof {:,d} reads that could not be matched to an insert, {:,d} reads without a barcode, {:,d} reads that could not be matched to a named insert".format(counter.unmatched_total, counter.unmatched_insert, counter.unmatched_barcodes, counter.unmatched_insert_sequence))
 
     min_counts_plot = config.get('profile_plot_min_count', 1)
+
+    mplversion = StrictVersion(mpl.__version__)
+    if mplversion.version[0] >= 2:
+        mpl.rcParams['xtick.direction'] = 'in'
+        mpl.rcParams['ytick.direction'] = 'in'
+        mpl.rcParams['xtick.top'] = True
+        mpl.rcParams['ytick.right'] = True
+    if args.xkcd:
+        plt.xkcd()
+
     for e in experiments:
         if args.resume and have_counts:
             counts = read_df_if_exists(rawcountsprefixes[e])
+            counts_bgsubt = read_df_if_exists(rawcountsprefixes_bgsubt[e])
         else:
             args.resume = False
             counts = e.counts_df
+            counts['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in counts.itertuples()])
+
+            with TimeLogger("performing background subtraction for experiment %s" % e.name, "finished background subtraction"):
+                counts_bgsubt = subtract_background(counts, os.path.join(args.outdir, "%sbackground_subtraction_histograms.pdf" % prefixes[e]))
             if len(e.sorted_cells):
                 with TimeLogger("normalizing counts for experiment %s" % e.name):
                     counts = normalizeCounts(counts, e.sorted_cells_df)
-            counts['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in counts.itertuples()])
+                    counts_bgsubt = normalizeCounts(counts_bgsubt, e.sorted_cells_df)
+
             dump_df(counts, rawcountsprefixes[e])
+            dump_df(counts_bgsubt, rawcountsprefixes_bgsubt[e])
 
         if e.dsi != DSIS.noDSI:
             dspecfile = os.path.join(intermediate_outdir, "dspec.pkl")
-            byaafile = os.path.join(args.outdir, "%sDSIs_byaa" % prefixes[e])
-            bynucfile = os.path.join(args.outdir, "%sDSIs_bynuc" % prefixes[e])
-
             dspec = False
-            dsi_byaa = False
-            dsi_bynuc = False
             if args.resume and os.path.isfile(dspecfile):
                 dspec = pickle.load(open(dspecfile, 'r+b'))
-            if args.resume:
-                dsi_byaa = read_df_if_exists(byaafile)
-                dsi_bynuc = read_df_if_exists(bynucfile)
-            if dspec is not False and dsi_byaa is not False and dsi_bynuc is not False:
-                logging.info("Found DSI data for experiment %s and resume is requested, continuing" % e.name)
-            else:
+            if not dspec:
                 args.resume = False
                 dspec = getDSISpec(e)
+                pickle.dump(dspec, open(dspecfile, 'w+b'), 3)
+
+            subdirs = ('DSIs_raw', 'DSIs_backgroundsubtracted')
+            dfs = (counts, counts_bgsubt)
+            msgs = ("raw reads", "background-subtracted reads")
+            for i in range(2):
+                logging.info("processing %s for experiment %s" % (msgs[i], e.name))
+                outdir = os.path.join(args.outdir, subdirs[i])
+                os.makedirs(outdir, exist_ok=True)
+
+                dsi_byaa = False
+                dsi_bynuc = False
+                byaafile = os.path.join(outdir, "%sDSIs_byaa" % prefixes[e])
+                bynucfile = os.path.join(outdir, "%sDSIs_bynuc" % prefixes[e])
+                if args.resume:
+                    dsi_byaa = read_df_if_exists(byaafile)
+                    dsi_bynuc = read_df_if_exists(bynucfile)
+                if dspec is not False and dsi_byaa is not False and dsi_bynuc is not False:
+                    logging.info("Found DSI data for experiment %s and resume is requested, continuing" % e.name)
+                else:
+                    args.resume = False
+                    if dspec:
+                        with TimeLogger("calculating DSIs for experiment %s" % e.name):
+                            dsi_byaa, dsi_bynuc = getDSI(dfs[i], dspec)
+
+                        dump_df(dsi_byaa, os.path.join(outdir, "%sDSIs_byaa" % prefixes[e]))
+                        dump_df(dsi_bynuc, os.path.join(outdir, "%sDSIs_bynuc" % prefixes[e]))
                 if dspec:
-                    with TimeLogger("calculating DSIs for experiment %s" % e.name):
-                        dsi_byaa, dsi_bynuc = getDSI(counts, dspec)
+                    ofile = os.path.join(outdir, "%sDSIs_byaa_cor.pdf" % prefixes[e])
+                    with TimeLogger("plotting DSI correlations for experiment %s into %s" % (e.name, ofile), "finished plotting DSI correlations"):
+                        plot_correlations(dsi_byaa, dspec, (1, counts[dspec.dsicol].cat.categories.size), ofile)
+                    ofile = os.path.join(outdir, "%sDSIs_byaa_cor_nostop.pdf" % prefixes[e])
+                    with TimeLogger("plotting DSI correlations for experiment %s into %s" % (e.name, ofile), "finished plotting DSI correlations"):
+                        plot_correlations(dsi_byaa[~dsi_byaa['translation'].str.contains('*', regex=False)], dspec, (1, counts[dspec.dsicol].cat.categories.size), ofile)
 
-                    dump_df(dsi_byaa, os.path.join(args.outdir, "%sDSIs_byaa" % prefixes[e]))
-                    dump_df(dsi_bynuc, os.path.join(args.outdir, "%sDSIs_bynuc" % prefixes[e]))
-                    pickle.dump(dspec, open(dspecfile, 'w+b'), 3)
-            if dspec:
-                if args.xkcd:
-                    plt.xkcd()
+                    histogramdir = os.path.join(outdir, "readcount_histograms")
+                    os.makedirs(histogramdir, exist_ok=True)
+                    with TimeLogger("plotting read count histograms for experiment %s" % e.name, "finished plotting read count histograms"):
+                        for q in np.linspace(0.9, 1, 11):
+                            ofile = os.path.join(histogramdir, "%sDSIs_bynuc_readcounts_%.2f_quantile.pdf" % (prefixes[e], q))
+                            plot_histograms(dsi_bynuc, dspec, ofile, q)
+                            plot_histograms(dsi_byaa, dspec, os.path.join(histogramdir, "%sDSIs_byaa_readcounts_%.2f_quantile.pdf" % (prefixes[e], q)), q)
 
-                ofile = os.path.join(args.outdir, "%sDSIs_byaa_cor.pdf" % prefixes[e])
-                with TimeLogger("plotting DSI correlations for experiment %s into %s" % (e.name, ofile), "finished plotting DSI correlations"):
-                    plot_correlations(dsi_byaa, dspec, (1, counts[dspec.dsicol].cat.categories.size), ofile)
-                ofile = os.path.join(args.outdir, "%sDSIs_byaa_cor_nostop.pdf" % prefixes[e])
-                with TimeLogger("plotting DSI correlations for experiment %s into %s" % (e.name, ofile), "finished plotting DSI correlations"):
-                    plot_correlations(dsi_byaa[~dsi_byaa['translation'].str.contains('*', regex=False)], dspec, (1, counts[dspec.dsicol].cat.categories.size), ofile)
-
-                histogramdir = os.path.join(args.outdir, "readcount_histograms")
-                os.makedirs(histogramdir, exist_ok=True)
-                for q in np.linspace(0.9, 1, 11):
-                    ofile = os.path.join(histogramdir, "%sDSIs_bynuc_readcounts_%.2f_quantile.pdf" % (prefixes[e], q))
-                    with TimeLogger("plotting read count histograms for experiment %s and quantile %.2f" % (e.name, q), "finished plotting read count histograms"):
-                        plot_histograms(dsi_bynuc, dspec, ofile, q)
-                        plot_histograms(dsi_byaa, dspec, os.path.join(histogramdir, "%sDSIs_byaa_readcounts_%.2f_quantile.pdf" % (prefixes[e], q)), q)
-
-                ofile = os.path.join(args.outdir, "%sbynuc_countplots.pdf" % prefixes[e])
-                with TimeLogger("plotting read count profiles for experiment %s into %s" % (e.name, ofile), "finished plotting read count profiles"):
-                    plot_profiles(counts, [dspec.groupby, dspec.seqcol], dspec, ofile, min_counts_plot)
-                ofile = os.path.join(args.outdir, "%sbyaa_countplots.pdf" % prefixes[e])
-                with TimeLogger("plotting read count profiles for experiment %s into %s" % (e.name, ofile), "finished plotting read count profiles"):
-                    plot_profiles(counts.groupby([dspec.groupby, dspec.dsicol, 'translation']).agg({'counts':'sum', 'normalized_counts':'sum'}).reset_index(), [dspec.groupby, 'translation'], dspec, ofile, min_counts_plot)
+                    ofile = os.path.join(outdir, "%sbynuc_countplots.pdf" % prefixes[e])
+                    with TimeLogger("plotting read count profiles for experiment %s into %s" % (e.name, ofile), "finished plotting read count profiles"):
+                        plot_profiles(counts, [dspec.groupby, dspec.seqcol], dspec, ofile, min_counts_plot)
+                    ofile = os.path.join(outdir, "%sbyaa_countplots.pdf" % prefixes[e])
+                    with TimeLogger("plotting read count profiles for experiment %s into %s" % (e.name, ofile), "finished plotting read count profiles"):
+                        plot_profiles(counts.groupby([dspec.groupby, dspec.dsicol, 'translation']).agg({'counts':'sum', 'normalized_counts':'sum'}).reset_index(), [dspec.groupby, 'translation'], dspec, ofile, min_counts_plot)
 
     stoptime = time.monotonic()
     logging.info("%s finished after %s" % (parser.prog, formatTime(stoptime - starttime)))
