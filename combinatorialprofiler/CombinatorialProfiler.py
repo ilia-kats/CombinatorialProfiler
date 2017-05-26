@@ -273,12 +273,12 @@ def subtract_background(df, filename):
     subt = grouped.apply(bgsubt)#.astype({'barcode_fw':'category', 'barcode_rev': 'category'})
 
     dfs = (df, subt)
-    title = ('raw read counts', 'background-subtracted read counts')
+    titles = ('raw read counts', 'background-subtracted read counts')
     with PdfPages(filename) as pdf:
-        fw = subt['barcode_fw'].cat.categories.sort_values()
-        rev = subt['barcode_rev'].cat.categories.sort_values()
-        for i in range(2):
-            grouped = dfs[i].query("counts > 0").groupby(['barcode_fw', 'barcode_rev'])
+        for cdf, title in zip(dfs, titles):
+            fw =cdf['barcode_fw'].cat.categories.sort_values()
+            rev = cdf['barcode_rev'].cat.categories.sort_values()
+            grouped = cdf.query("counts > 0").groupby(['barcode_fw', 'barcode_rev'])
             fig, ax = plt.subplots(nrows=fw.size, ncols=rev.size, sharex=True, sharey=True, squeeze=False)
             plt.subplots_adjust(left=0.125, right=0.9, bottom=0.1, top=0.9, wspace=0, hspace=0)
 
@@ -318,7 +318,7 @@ def subtract_background(df, filename):
             box = fig.get_tightbbox(get_renderer(fig))
             fig.text(0.5, (box.ymin - 0.1) / h, "read counts", ha="center")
             fig.text((box.xmin - 0.2) / w, 0.5, "frequency", va="center", rotation="vertical")
-            fig.suptitle(title[i], y=(box.ymax + 0.2) / h)
+            fig.suptitle(title, y=(box.ymax + 0.2) / h)
 
             pdf.savefig(bbox_inches="tight")
             plt.close()
@@ -530,9 +530,9 @@ def main():
             subdirs = ('DSIs_raw', 'DSIs_backgroundsubtracted')
             dfs = (counts, counts_bgsubt)
             msgs = ("raw reads", "background-subtracted reads")
-            for i in range(2):
-                logging.info("processing %s for experiment %s" % (msgs[i], e.name))
-                outdir = os.path.join(args.outdir, subdirs[i])
+            for sd, df, msg in zip(subdirs, dfs, msgs):
+                logging.info("processing %s for experiment %s" % (msg, e.name))
+                outdir = os.path.join(args.outdir, sd)
                 os.makedirs(outdir, exist_ok=True)
 
                 dsi_byaa = False
@@ -548,7 +548,7 @@ def main():
                     args.resume = False
                     if dspec:
                         with TimeLogger("calculating DSIs for experiment %s" % e.name):
-                            dsi_byaa, dsi_bynuc = getDSI(dfs[i], dspec)
+                            dsi_byaa, dsi_bynuc = getDSI(df, dspec)
 
                         dump_df(dsi_byaa, os.path.join(outdir, "%sDSIs_byaa" % prefixes[e]))
                         dump_df(dsi_bynuc, os.path.join(outdir, "%sDSIs_bynuc" % prefixes[e]))
