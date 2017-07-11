@@ -67,9 +67,9 @@ class DFCreator:
                 denominator = 0
                 for r, rev in enumerate(revcodes):
                     if (fw, rev) in normalizedreads_nuc and s in normalizedreads_nuc[(fw, rev)]:
-                        numerator += (r + 1) * normalizedreads_nuc[(fw, rev)][s]
+                        numerator += (r / (len(revcodes) - 1)) * normalizedreads_nuc[(fw, rev)][s]
                         denominator += normalizedreads_nuc[(fw, rev)][s]
-                if numerator > 0 and denominator > 0:
+                if denominator > 0:
                     self.dsi_nuc.setdefault(fw, {})[s] = numerator / denominator
                     aa = str(Bio.Seq.Seq(s, Bio.Alphabet.generic_dna).translate())
                     self.dsi_aa_median.setdefault(fw, {}).setdefault(aa, []).append(numerator / denominator)
@@ -78,9 +78,9 @@ class DFCreator:
                 denominator = 0
                 for r, rev in enumerate(revcodes):
                     if (fw, rev) in normalizedreads_aa and s in normalizedreads_aa[(fw, rev)]:
-                        numerator += (r + 1) * normalizedreads_aa[(fw, rev)][s]
+                        numerator += (r / (len(revcodes) - 1)) * normalizedreads_aa[(fw, rev)][s]
                         denominator += normalizedreads_aa[(fw, rev)][s]
-                if numerator > 0 and denominator > 0:
+                if denominator > 0:
                     self.dsi_aa_pooled.setdefault(fw, {})[s] = numerator / denominator
         for fw, nn in self.dsi_aa_median.items():
             for aa, l in nn.items():

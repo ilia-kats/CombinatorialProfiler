@@ -109,7 +109,7 @@ def getDSISpec(e):
 def getDSI(df, dspec):
     statsfuns = ['min', 'max', 'mean', 'median', 'std', 'sum']
 
-    fractionvals = pd.Series(range(1, df[dspec.dsicol].cat.categories.size + 1), index=df[dspec.dsicol].cat.categories)
+    fractionvals = pd.Series(np.linspace(0, 1, df[dspec.dsicol].cat.categories.size), index=df[dspec.dsicol].cat.categories)
 
     df['normalized_counts_cells'] = df.set_index(dspec.dsicol, append=True)['normalized_counts'].mul(fractionvals, level=dspec.dsicol).reset_index(level=dspec.dsicol, drop=True)
 
