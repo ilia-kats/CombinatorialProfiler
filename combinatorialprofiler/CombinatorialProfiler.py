@@ -299,7 +299,7 @@ def subtract_background(df, filename):
                     except KeyError:
                         continue
                     c = g['counts']
-                    nbins = min(100, int(c.size / 10))
+                    nbins = max(min(100, int(c.size / 10)), 1)
                     ax[y, x].hist(c, bins=np.logspace(np.log10(c.min()), np.log10(c.max()), nbins), color="#000000", alpha=0.66, edgecolor='none')
                     #if x > 0:
                         #plt.setp(ax[y, x].get_yticklines(), visible=False)
