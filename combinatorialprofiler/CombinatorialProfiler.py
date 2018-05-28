@@ -407,10 +407,11 @@ def main():
     intermediate_outdir = os.path.join(args.outdir, 'intermediates')
     os.makedirs(intermediate_outdir, exist_ok=True)
 
-    for fw, rev in zip(args.fastq[::2], args.fastq[1::2]):
+    resume = [args.resume] * round(len(args.fastq) * 0.5)
+    for i, fw, rev in zip(range(len(resume)), args.fastq[::2], args.fastq[1::2]):
         logging.info("Processing FASTQ pair %s and %s" % (fw, rev))
-        if not args.resume or not os.path.isfile(os.path.join(fqcoutdir, os.path.splitext(os.path.basename(fw))[0]) + "_fastqc.html") or not os.path.isfile(os.path.join(fqcoutdir, os.path.splitext(os.path.basename(rev))[0]) + "_fastqc.html"):
-            args.resume = False
+        if not resume[i] or not os.path.isfile(os.path.join(fqcoutdir, os.path.splitext(os.path.basename(fw))[0]) + "_fastqc.html") or not os.path.isfile(os.path.join(fqcoutdir, os.path.splitext(os.path.basename(rev))[0]) + "_fastqc.html"):
+            resume[i] = False
             if exec_with_logging([args.fastqc, '--outdir=%s' % fqcoutdir] + [fw, rev], "fastqc"):
                 return 1
         else:
@@ -440,8 +441,8 @@ def main():
         bowtiesam = os.path.join(intermediate_outdir, 'phix_alignment.sam')
         bowtiemetrics = os.path.join(intermediate_outdir, 'phix_alignment_metrics.txt')
 
-        if not args.resume or not os.path.isfile(bowtieout) or not os.path.isfile(bowtiesam) or not os.path.isfile(bowtiemetrics) or not os.path.isfile(fqnames[0]) or not os.path.isfile(fqnames[1]):
-            args.resume = False
+        if not resume[i] or not os.path.isfile(bowtieout) or not os.path.isfile(bowtiesam) or not os.path.isfile(bowtiemetrics) or not os.path.isfile(fqnames[0]) or not os.path.isfile(fqnames[1]):
+            resume[i] = False
             if exec_with_logging([args.bowtie, '-p', str(args.threads), '--local', '--un-conc', bowtiefqname, '-x', args.phix_index, '-1', fw, '-2', rev, '-S', bowtiesam, '--no-unal', '--met-file', bowtiemetrics], "bowtie2", err=bowtieout):
                 return 1
         else:
@@ -450,8 +451,8 @@ def main():
         mergedfqpath = os.path.join(intermediate_outdir, mergedfqname)
         mergedfqname += '.assembled.fastq'
         pearout = os.path.join(intermediate_outdir, 'pear_summary.txt')
-        if not args.resume or not os.path.isfile(pearout) or not os.path.isfile(os.path.join(intermediate_outdir, mergedfqname)):
-            args.resume = False
+        if not resume[i] or not os.path.isfile(pearout) or not os.path.isfile(os.path.join(intermediate_outdir, mergedfqname)):
+            resume[i] = False
             if exec_with_logging([args.pear, '-j', str(args.threads), '-f', fqnames[0], '-r', fqnames[1], '-o', mergedfqpath], "PEAR", out=pearout):
                 return 1
         else:
@@ -478,10 +479,10 @@ def main():
                     have_counts = False
                     break
 
-        if args.resume and have_counts:
+        if resume[i] and have_counts:
             logging.info("Found raw counts for all experiments and resume is requested, continuing")
         else:
-            args.resume = False
+            resume[i] = False
             with TimeLogger("counting reads"):
                 counter.countReads(os.path.join(intermediate_outdir, mergedfqname), os.path.join(unmatcheddir, "unmapped"), args.threads)
             logging.info("{:,d} total reads".format(counter.read))
@@ -499,12 +500,13 @@ def main():
     if args.xkcd:
         plt.xkcd()
 
+    resume = all(resume)
     for e in experiments:
-        if args.resume and have_counts:
+        if resume and have_counts:
             counts = read_df_if_exists(rawcountsprefixes[e])
             counts_bgsubt = read_df_if_exists(rawcountsprefixes_bgsubt[e])
         else:
-            args.resume = False
+            resume = False
             counts = e.counts_df
             counts['translation'] = pd.Series([str(Bio.Seq.Seq(str(x.sequence), Bio.Alphabet.generic_dna).translate()) for x in counts.itertuples()])
 
@@ -521,10 +523,10 @@ def main():
         if e.dsi != DSIS.noDSI:
             dspecfile = os.path.join(intermediate_outdir, "dspec.pkl")
             dspec = False
-            if args.resume and os.path.isfile(dspecfile):
+            if resume and os.path.isfile(dspecfile):
                 dspec = pickle.load(open(dspecfile, 'r+b'))
             if not dspec:
-                args.resume = False
+                resume = False
                 dspec = getDSISpec(e)
                 pickle.dump(dspec, open(dspecfile, 'w+b'), 3)
 
@@ -540,13 +542,13 @@ def main():
                 dsi_bynuc = False
                 byaafile = os.path.join(outdir, "%sDSIs_byaa" % prefixes[e])
                 bynucfile = os.path.join(outdir, "%sDSIs_bynuc" % prefixes[e])
-                if args.resume:
+                if resume:
                     dsi_byaa = read_df_if_exists(byaafile)
                     dsi_bynuc = read_df_if_exists(bynucfile)
                 if dspec is not False and dsi_byaa is not False and dsi_bynuc is not False:
                     logging.info("Found DSI data for experiment %s and resume is requested, continuing" % e.name)
                 else:
-                    args.resume = False
+                    resume = False
                     if dspec:
                         with TimeLogger("calculating DSIs for experiment %s" % e.name):
                             dsi_byaa, dsi_bynuc = getDSI(df, dspec)
