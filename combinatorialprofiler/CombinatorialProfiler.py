@@ -366,6 +366,7 @@ def main():
 
     os.makedirs(args.outdir, exist_ok=True)
     logging.basicConfig(filename=os.path.join(args.outdir, 'log.txt'), filemode='w', format='%(levelname)s:%(asctime)s:%(message)s', level=getattr(logging, args.log_level))
+    logging.getLogger('matplotlib').setLevel('INFO')
 
     logging.info("%s version %s" % (parser.prog, version))
     logging.info(" ".join(sys.argv))
