@@ -262,6 +262,8 @@ def plot_correlations(df, dspec, limits, filename):
 def subtract_background(df, filename):
     mix = GaussianMixture(n_components=2, tol=1e-8, max_iter=int(1e4))
     def bgsubt(g):
+        if g['counts'].size <= 1:
+            return g
         mix.fit(np.log10(g['counts'].values.reshape(-1, 1)))
         means = mix.means_.reshape(-1)
         covs = mix.covariances_.reshape(-1)
