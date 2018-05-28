@@ -8,7 +8,7 @@ import pandas as pd
 
 def get_csv_reader(f):
     if not isinstance(f, IOBase):
-        f = open(f, newline='')
+        f = open(f, newline=None)
     sample = f.read(1024)
     f.seek(0)
     s = csv.Sniffer()
