@@ -116,7 +116,7 @@ class TwoColumnWidget(QWidget):
             self._fromFile(path)
 
     def fromClipboard(self):
-        f = StringIO(QApplication.clipboard().text())
+        f = StringIO(QApplication.clipboard().text(), newline=None)
         self._fromFile(f)
 
     def removeSequences(self):
