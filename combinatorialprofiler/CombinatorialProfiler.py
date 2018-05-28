@@ -555,10 +555,10 @@ def main():
                 if dspec:
                     ofile = os.path.join(outdir, "%sDSIs_byaa_cor.pdf" % prefixes[e])
                     with TimeLogger("plotting DSI correlations for experiment %s into %s" % (e.name, ofile), "finished plotting DSI correlations"):
-                        plot_correlations(dsi_byaa, dspec, (1, counts[dspec.dsicol].cat.categories.size), ofile)
+                        plot_correlations(dsi_byaa, dspec, (0,1), ofile)
                     ofile = os.path.join(outdir, "%sDSIs_byaa_cor_nostop.pdf" % prefixes[e])
                     with TimeLogger("plotting DSI correlations for experiment %s into %s" % (e.name, ofile), "finished plotting DSI correlations"):
-                        plot_correlations(dsi_byaa[~dsi_byaa['translation'].str.contains('*', regex=False)], dspec, (1, counts[dspec.dsicol].cat.categories.size), ofile)
+                        plot_correlations(dsi_byaa[~dsi_byaa['translation'].str.contains('*', regex=False)], dspec, (0,1), ofile)
 
                     histogramdir = os.path.join(outdir, "readcount_histograms")
                     os.makedirs(histogramdir, exist_ok=True)
