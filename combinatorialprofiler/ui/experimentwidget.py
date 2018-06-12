@@ -3,7 +3,7 @@ from io import StringIO
 from pkg_resources import resource_stream
 
 from PyQt5.QtWidgets import QApplication, QWidget, QTableWidgetItem, QStyle, QMessageBox, QFileDialog
-from PyQt5.QtCore import QRegularExpression, Qt, pyqtSignal
+from PyQt5.QtCore import QRegularExpression, QLocale, Qt, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator, QRegularExpressionValidator, QIcon
 from PyQt5 import uic
 
@@ -29,7 +29,9 @@ class ExperimentWidget(QWidget):
         else:
             self.ui.fromClipboardBtn.setText("Paste")
 
-        self.cellsdelegate = SimpleDelegate(QDoubleValidator(0, 1, 1000), self)
+        cellsvalidator = QDoubleValidator(0, 1, 1000)
+        cellsvalidator.setLocale(QLocale(QLocale.English, QLocale.UnitedStates))
+        self.cellsdelegate = SimpleDelegate(cellsvalidator, self)
         proto = QTableWidgetItem()
         proto.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled)
         proto.setData(Qt.EditRole, "0.0")
