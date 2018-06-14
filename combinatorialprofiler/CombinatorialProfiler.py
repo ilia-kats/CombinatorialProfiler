@@ -439,9 +439,9 @@ def main():
             bowtiefqname = os.path.join(intermediate_outdir, 'sequence_%.fastq')
             mergedfqname = 'sequence'
 
-        bowtieout = os.path.join(intermediate_outdir, 'phix_alignment_summary.txt')
-        bowtiesam = os.path.join(intermediate_outdir, 'phix_alignment.sam')
-        bowtiemetrics = os.path.join(intermediate_outdir, 'phix_alignment_metrics.txt')
+        bowtieout = os.path.join(intermediate_outdir, '%s_phix_alignment_summary.txt' % mergedfqname)
+        bowtiesam = os.path.join(intermediate_outdir, '%s_phix_alignment.sam' % mergedfqname)
+        bowtiemetrics = os.path.join(intermediate_outdir, '%s_phix_alignment_metrics.txt' % mergedfqname)
 
         if not resume[i] or not os.path.isfile(bowtieout) or not os.path.isfile(bowtiesam) or not os.path.isfile(bowtiemetrics) or not os.path.isfile(fqnames[0]) or not os.path.isfile(fqnames[1]):
             resume[i] = False
