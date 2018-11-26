@@ -343,6 +343,9 @@ def read_df_if_exists(prefix, read=True):
 class InvalidArgumentException(BaseException):
     pass
 
+def log_exception(type, value, traceback):
+    logging.critical("Uncaught exception occurred:", exc_info=(type, value, traceback))
+
 def main():
     import argparse
     import difflib
@@ -368,6 +371,9 @@ def main():
 
     os.makedirs(args.outdir, exist_ok=True)
     logging.basicConfig(filename=os.path.join(args.outdir, 'log.txt'), filemode='w', format='%(levelname)s:%(asctime)s:%(message)s', level=getattr(logging, args.log_level))
+
+    sys.excepthook = log_exception
+
     logging.getLogger('matplotlib').setLevel('INFO')
 
     logging.info("%s version %s" % (parser.prog, version))
