@@ -349,11 +349,12 @@ def log_exception(type, value, traceback):
 def main():
     import argparse
     import difflib
+    import re
 
     parser = argparse.ArgumentParser(prog=progname, description='Process paired-end Illumina reads for combinatorial degron profiling')
     parser.add_argument('fastq', nargs='*', help='FASTQ files containing the reads to process. If more than two FASTQ files are given, every two consecutive files are assumed to contained paired-end reads and will be processed together. Read counts from all files will be aggregated for DSI calculation.')
     parser.add_argument('-o', '--outdir', required=False, default=os.getcwd(), help='Output directory')
-    parser.add_argument('--fastqc', required=False, default='fastqc', help='Path to the fastq executable. If not given, fastqc will be assumed to be in PATH')
+    parser.add_argument('--fastqc', required=False, default='fastqc', help='Path to the fastqc executable. If not given, fastqc will be assumed to be in PATH')
     parser.add_argument('--bowtie', required=False, default='bowtie2', help='Path to the bowtie2 executable. If not given, bowtie2 will be assumed to be in PATH')
     parser.add_argument('--phix-index', required=True, help='Path to the bowtie index of the PhiX genome.')
     parser.add_argument('--pear', required=False, default='pear', help='Path to the PEAR binary. If not given, pear will be assumed to be in PATH')
@@ -418,7 +419,11 @@ def main():
     resume = [args.resume] * round(len(args.fastq) * 0.5)
     for i, fw, rev in zip(range(len(resume)), args.fastq[::2], args.fastq[1::2]):
         logging.info("Processing FASTQ pair %s and %s" % (fw, rev))
-        if not resume[i] or not os.path.isfile(os.path.join(fqcoutdir, os.path.splitext(os.path.basename(fw))[0]) + "_fastqc.html") or not os.path.isfile(os.path.join(fqcoutdir, os.path.splitext(os.path.basename(rev))[0]) + "_fastqc.html"):
+        fqcoutname = [None] * 2
+        for j, fq in enumerate((fw, rev)):
+            # this is FastQC's filename generating algorithm, see https://github.com/s-andrews/FastQC/blob/master/uk/ac/babraham/FastQC/Analysis/OfflineRunner.java#L170
+            fqcoutname[j] = re.sub(r'\.fq$', '', re.sub(r'\.fastq$', '', re.sub(r'\.txt$', '', re.sub(r'\.bz2$', '', re.sub(r'\.gz$', '', os.path.splitext(os.path.basename(fq))[0])))))
+        if not resume[i] or not os.path.isfile(os.path.join(fqcoutdir, fqcoutname[0] + "_fastqc.html")) or not os.path.isfile(os.path.join(fqcoutdir, fqcoutname[1] + "_fastqc.html")):
             resume[i] = False
             if exec_with_logging([args.fastqc, '--outdir=%s' % fqcoutdir] + [fw, rev], "fastqc"):
                 return 1
