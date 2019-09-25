@@ -72,7 +72,7 @@ class TimeLogger:
 def normalizeCounts(df, sortedcells):
     df = df.set_index(['experiment','barcode_fw', 'barcode_rev','sequence'])
 
-    counts_sum = df['counts'] / df.groupby(level=['barcode_fw', 'barcode_rev'])['counts'].transform(sum)
+    counts_sum = df['counts'] / df.groupby(level=['barcode_fw', 'barcode_rev'], observed=True)['counts'].transform(sum)
     counts_sum.name = 'normalized_counts'
     counts_sum = counts_sum.reset_index(['experiment', 'sequence']).join(sortedcells).set_index(['experiment', 'sequence'], append=True)
     df['normalized_counts'] = (counts_sum['normalized_counts'] * counts_sum['sortedcells']).reorder_levels(df.index.names)
@@ -117,18 +117,18 @@ def getDSI(df, dspec):
     if 'named_insert' in df.columns:
         groupbyl.append('named_insert')
 
-    g = df.groupby(groupbyl + ['translation','sequence'])
-    byseq = (g['normalized_counts_cells'].sum() / g['normalized_counts'].sum()).dropna()
+    g = df.groupby(groupbyl + ['translation','sequence'], observed=True)
+    byseq = g['normalized_counts_cells'].sum() / g['normalized_counts'].sum()
     byseq.name = 'dsi'
     byseq_stats = g.agg({'counts': statsfuns, 'normalized_counts': statsfuns})
     byseq_stats.columns = ['_'.join(col) for col in byseq_stats.columns.values]
     byseq_stats['nfractions'] = g.agg('size')
 
-    byaa_median = byseq.groupby(level=groupbyl + ['translation']).median().dropna()
+    byaa_median = byseq.groupby(level=groupbyl + ['translation'], observed=True).median()
     byaa_median.name = 'median_dsi'
 
-    g = df.groupby(groupbyl + ['translation'])
-    byaa_pooled = (g['normalized_counts_cells'].sum() / g['normalized_counts'].sum()).dropna()
+    g = df.groupby(groupbyl + ['translation'], observed=True)
+    byaa_pooled = g['normalized_counts_cells'].sum() / g['normalized_counts'].sum()
     byaa_pooled.name = 'pooled_dsi'
 
     byaa_stats = g.agg({'counts': statsfuns, 'normalized_counts': statsfuns})
@@ -167,7 +167,7 @@ def plot_profiles(df, groupby, dspec, filename, min_counts=1):
     labels = df[dspec.dsicol].cat.categories
     integer_map = dict([(val, i) for i, val in enumerate(labels)])
     with PdfPages(filename) as pdf:
-        for (code, seq), group in df.groupby(groupby):
+        for (code, seq), group in df.groupby(groupby, observed=True):
             if group['counts'].sum() < min_counts:
                 continue
 
@@ -186,7 +186,7 @@ def plot_profiles(df, groupby, dspec, filename, min_counts=1):
 
 def plot_histograms(df, dspec, filename, quantile=1):
     with PdfPages(filename) as pdf:
-        for code, group in df.groupby(dspec.groupby):
+        for code, group in df.groupby(dspec.groupby, observed=True):
             counts = group['counts_sum'][group['counts_sum'] <= group['counts_sum'].quantile(quantile)]
 
             fig = plt.figure(figsize=(5,3))
@@ -209,7 +209,7 @@ def plot_histograms(df, dspec, filename, quantile=1):
 
 def plot_correlations(df, dspec, limits, filename):
     with PdfPages(filename) as pdf:
-        for code, group in df.groupby(dspec.groupby):
+        for code, group in df.groupby(dspec.groupby, observed=True):
             c = group['median_dsi'].corr(group['pooled_dsi'], method='spearman')
 
             fig = plt.figure(figsize=(7,7))
@@ -280,7 +280,7 @@ def subtract_background(df, filename):
         for cdf, title in zip(dfs, titles):
             fw =cdf['barcode_fw'].cat.categories.sort_values()
             rev = cdf['barcode_rev'].cat.categories.sort_values()
-            grouped = cdf.query("counts > 0").groupby(['barcode_fw', 'barcode_rev'])
+            grouped = cdf.query("counts > 0").groupby(['barcode_fw', 'barcode_rev'], observed=True)
             fig, ax = plt.subplots(nrows=fw.size, ncols=rev.size, sharex=True, sharey=True, squeeze=False)
             plt.subplots_adjust(left=0.125, right=0.9, bottom=0.1, top=0.9, wspace=0, hspace=0)
 
@@ -589,7 +589,7 @@ def main():
                         plot_profiles(counts, [dspec.groupby, dspec.seqcol], dspec, ofile, min_counts_plot)
                     ofile = os.path.join(outdir, "%sbyaa_countplots.pdf" % prefixes[e])
                     with TimeLogger("plotting read count profiles for experiment %s into %s" % (e.name, ofile), "finished plotting read count profiles"):
-                        plot_profiles(counts.groupby([dspec.groupby, dspec.dsicol, 'translation']).agg({'counts':'sum', 'normalized_counts':'sum'}).reset_index(), [dspec.groupby, 'translation'], dspec, ofile, min_counts_plot)
+                        plot_profiles(counts.groupby([dspec.groupby, dspec.dsicol, 'translation'], observed=True).agg({'counts':'sum', 'normalized_counts':'sum'}).reset_index(), [dspec.groupby, 'translation'], dspec, ofile, min_counts_plot)
 
     stoptime = time.monotonic()
     logging.info("%s finished after %s" % (parser.prog, formatTime(stoptime - starttime)))

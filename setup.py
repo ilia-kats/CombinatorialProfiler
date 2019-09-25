@@ -40,7 +40,7 @@ class debugmode(develop):
         readcounter[0] = cythonize(readcounter)[0]
 
 
-dependencies = ['numpy', 'scipy', 'pandas>=0.19', 'matplotlib>=1.5.1', 'scikit-learn>=0.18', 'biopython', 'llist']
+dependencies = ['numpy', 'scipy', 'pandas>=0.23', 'matplotlib>=1.5.1', 'scikit-learn>=0.18', 'biopython', 'llist']
 
 def run_setup(deps, with_binary=True):
     entry_points = {
