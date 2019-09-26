@@ -443,11 +443,13 @@ def main():
                 template = '%s{0}%s' % (fastq[0][b[0][0]:b[0][0]+b[0][2]], fastq[0][b[1][0]:b[1][0]+b[1][2]])
                 fqnames = [os.path.join(intermediate_outdir, template.format(i)) for i in range(1,3)]
                 bowtiefqname = os.path.join(intermediate_outdir, template.format('%'))
+                if not bowtiefqname.endswith(".gz"):
+                    bowtiefqname = bowtiefqname + ".gz"
                 mergedfqname = fastq[0][b[0][0]:b[0][0]+b[0][2]]
 
         if not fqnames:
-            fqnames = [os.path.join(intermediate_outdir, 'sequence_%d.fastq' % i) for i in range(1,3)]
-            bowtiefqname = os.path.join(intermediate_outdir, 'sequence_%.fastq')
+            fqnames = [os.path.join(intermediate_outdir, 'sequence_%d.fastq.gz' % i) for i in range(1,3)]
+            bowtiefqname = os.path.join(intermediate_outdir, 'sequence_%.fastq.gz')
             mergedfqname = 'sequence'
 
         bowtieout = os.path.join(intermediate_outdir, '%s_phix_alignment_summary.txt' % mergedfqname)
@@ -456,7 +458,7 @@ def main():
 
         if not resume[i] or not os.path.isfile(bowtieout) or not os.path.isfile(bowtiesam) or not os.path.isfile(bowtiemetrics) or not os.path.isfile(fqnames[0]) or not os.path.isfile(fqnames[1]):
             resume[i] = False
-            if exec_with_logging([args.bowtie, '-p', str(args.threads), '--local', '--un-conc', bowtiefqname, '-x', args.phix_index, '-1', fw, '-2', rev, '-S', bowtiesam, '--no-unal', '--met-file', bowtiemetrics], "bowtie2", err=bowtieout):
+            if exec_with_logging([args.bowtie, '-p', str(args.threads), '--local', '--un-conc-gz', bowtiefqname, '-x', args.phix_index, '-1', fw, '-2', rev, '-S', bowtiesam, '--no-unal', '--met-file', bowtiemetrics], "bowtie2", err=bowtieout):
                 return 1
         else:
             logging.info("Found bowtie2 output and resume is requested, continuing")
