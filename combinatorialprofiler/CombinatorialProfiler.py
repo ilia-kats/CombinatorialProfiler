@@ -591,10 +591,10 @@ def main():
 
                     ofile = os.path.join(outdir, "%sbynuc_countplots.pdf" % prefixes[e])
                     with TimeLogger("plotting read count profiles for experiment %s into %s" % (e.name, ofile), "finished plotting read count profiles"):
-                        plot_profiles(counts, [dspec.groupby, dspec.seqcol], dspec, ofile, min_counts_plot)
+                        plot_profiles(df, [dspec.groupby, dspec.seqcol], dspec, ofile, min_counts_plot)
                     ofile = os.path.join(outdir, "%sbyaa_countplots.pdf" % prefixes[e])
                     with TimeLogger("plotting read count profiles for experiment %s into %s" % (e.name, ofile), "finished plotting read count profiles"):
-                        plot_profiles(counts.groupby([dspec.groupby, dspec.dsicol, 'translation'], observed=True).agg({'counts':'sum', 'normalized_counts':'sum'}).reset_index(), [dspec.groupby, 'translation'], dspec, ofile, min_counts_plot)
+                        plot_profiles(df.groupby([dspec.groupby, dspec.dsicol, 'translation'], observed=True).agg({'counts':'sum', 'normalized_counts':'sum'}).reset_index(), [dspec.groupby, 'translation'], dspec, ofile, min_counts_plot)
 
     stoptime = time.monotonic()
     logging.info("%s finished after %s" % (parser.prog, formatTime(stoptime - starttime)))
