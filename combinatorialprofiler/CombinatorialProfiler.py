@@ -433,7 +433,12 @@ def main():
         fqnames = None
         bowtiefqname = None
         mergedfqname = None
-        fastq = [os.path.basename(fq) for fq in (fw, rev)]
+        fastq = []
+        for fq in (fw, rev):
+            fq = os.path.basename(fq)
+            if not fq.endswith(".gz"):
+                fq = fq + ".gz"
+            fastq.append(fq)
         if len(fastq[0]) == len(fastq[1]):
             s = difflib.SequenceMatcher(a=fastq[0], b=fastq[1])
             if s.ratio() >= 2 * (len(fastq[0]) - 1) / (2 * len(fastq[1])):
@@ -443,8 +448,6 @@ def main():
                 template = '%s{0}%s' % (fastq[0][b[0][0]:b[0][0]+b[0][2]], fastq[0][b[1][0]:b[1][0]+b[1][2]])
                 fqnames = [os.path.join(intermediate_outdir, template.format(i)) for i in range(1,3)]
                 bowtiefqname = os.path.join(intermediate_outdir, template.format('%'))
-                if not bowtiefqname.endswith(".gz"):
-                    bowtiefqname = bowtiefqname + ".gz"
                 mergedfqname = fastq[0][b[0][0]:b[0][0]+b[0][2]]
 
         if not fqnames:
